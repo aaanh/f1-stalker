@@ -1,0 +1,21 @@
+mod about;
+mod boot_screen;
+mod championship_charts;
+mod components;
+mod dashboard;
+mod decals;
+mod driver_card;
+mod driver_picker;
+pub mod fonts;
+pub mod icons;
+mod layout;
+mod pinned_drivers;
+mod quali_grid;
+mod weather_panel;
+mod scroll;
+mod settings;
+mod shell;
+mod title_bar;
+pub mod theme;
+
+pub use shell::shell;

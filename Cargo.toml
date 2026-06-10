@@ -1,0 +1,38 @@
+[package]
+name = "f1-stalker"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.95"
+description = "F1 season dashboard"
+
+[dependencies]
+chrono = { version = "0.4", features = ["serde"] }
+directories = "6.0"
+iced = { version = "0.13", features = ["tokio", "image", "canvas", "svg"] }
+openf1 = { path = "../openf1-client/sdks/rust/openf1" }
+rusqlite = { version = "0.37", features = ["bundled"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+sha2 = "0.10"
+bytes = "1"
+image = { version = "0.24", default-features = false, features = ["png"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.5.2"
+objc2-app-kit = { version = "0.2.2", features = [
+    "NSApplication",
+    "NSBitmapImageRep",
+    "NSDockTile",
+    "NSGraphics",
+    "NSImage",
+    "NSMenu",
+    "NSMenuItem",
+    "NSRunningApplication",
+] }
+objc2-foundation = { version = "0.2.2", features = ["NSProcessInfo", "NSString"] }
+
+[dev-dependencies]
+pretty_assertions = "1.4"
