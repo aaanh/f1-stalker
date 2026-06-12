@@ -67,5 +67,7 @@ iconutil -c icns "$iconset" -o "$icns"
 /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" "$app/Contents/Info.plist" 2>/dev/null \
   || /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile AppIcon" "$app/Contents/Info.plist"
 
+"$root/scripts/sign-macos-app.sh" "$app"
+
 echo "built $app"
 echo "open \"$app\""

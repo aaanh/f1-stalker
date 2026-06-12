@@ -10,6 +10,8 @@ dmg="$root/target/F1-Stalker-${version}-macos-arm64.dmg"
 if [[ ! -d "$app" ]]; then
   cargo build --profile "$profile" --manifest-path "$root/Cargo.toml"
   "$root/scripts/build-macos-app.sh" "$profile"
+else
+  "$root/scripts/sign-macos-app.sh" "$app"
 fi
 
 staging="$root/target/dmg-staging"
