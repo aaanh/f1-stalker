@@ -65,7 +65,7 @@ export function App() {
               {`You can't get enough of Formula One (TM)? You live and breathe the
               drama, the bottling, and the comedy? Then you're probably just
               like me. That's why I built this app to track the results and
-              upcoming races. And if you're a sadistically masochistic, you
+              upcoming races. And if you're sadistically masochistic, you
               would have built it in Rust, like I did, too!`}
             </p>
             <h2>Downloads</h2>
