@@ -35,11 +35,30 @@ export function App() {
         />
       </head>
       <div className="flex min-h-svh w-full flex-col bg-neutral-800">
-        <header className="flex w-full items-center gap-2 p-2">
-          <Logo className="rounded-full border border-red-500 p-1" size={48} />
-          <h1 className="text-4xl">F1 Stalker</h1>
+        <header className="fixed flex w-full items-center justify-between gap-2 bg-background p-4">
+          <div className="flex items-center gap-2">
+            <Logo
+              className="rounded-full border border-red-500 p-1"
+              size={48}
+            />
+            <h1 className="text-4xl">F1 Stalker</h1>
+          </div>
+          <ButtonGroup className="flex flex-wrap">
+            <a
+              className={buttonVariants({ variant: "default" })}
+              href="https://gitlab.com/aaanh/f1-stalker"
+            >
+              GitLab (F1 Stalker)
+            </a>
+            <a
+              className={buttonVariants({ variant: "default" })}
+              href="https://gitlab.com/aaanh/f1-client"
+            >
+              GitLab (OpenF1 Client)
+            </a>
+          </ButtonGroup>
         </header>
-        <div className="container mx-auto pb-12">
+        <div className="container mx-auto py-24 pb-12">
           <main className="mx-auto prose rounded-lg bg-neutral-900 p-4 lg:prose-xl dark:prose-invert">
             <h2>What?</h2>
             <p>
