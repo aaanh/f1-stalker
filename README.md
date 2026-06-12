@@ -1,5 +1,9 @@
 # F1 Stalker
 
+> [!NOTE] 
+> GitLab is the official home of the app! https://gitlab.com/aaanh/f1-stalker
+> GitHub is the mirror: http://github.com/aaanh/f1-stalker
+
 You can't get enough of Formula One? You live and breathe the drama, the bottling, and the comedy? Then you're probably just like me. That's why I built this app to track the results and upcoming races.
 
 And if you're a sadistically masochistic, you would have built it in Rust, like me.
