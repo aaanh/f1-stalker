@@ -1,6 +1,29 @@
 use chrono::{DateTime, Utc};
 use openf1::Meeting;
 
+use crate::domain::CountdownTarget;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SeasonPhase {
+    PreSeason,
+    RaceWeekend,
+    OffWeekend,
+    SeasonComplete,
+}
+
+pub fn season_phase(triplet: &RaceTriplet, countdown: &CountdownTarget) -> SeasonPhase {
+    if matches!(countdown, CountdownTarget::SeasonComplete) {
+        return SeasonPhase::SeasonComplete;
+    }
+    if triplet.current_is_weekend {
+        return SeasonPhase::RaceWeekend;
+    }
+    if triplet.previous.is_none() {
+        return SeasonPhase::PreSeason;
+    }
+    SeasonPhase::OffWeekend
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RaceTripletSlot {
     Previous,
@@ -126,5 +149,42 @@ mod tests {
         let triplet = compute_race_triplet(&meetings, now).unwrap();
         assert!(triplet.previous.is_none());
         assert_eq!(triplet.upcoming.meeting_key, 2);
+    }
+
+    #[test]
+    fn season_phase_pre_season_before_first_gp() {
+        let meetings = vec![meeting(1, "2026-03-08T00:00:00Z", "2026-03-10T00:00:00Z")];
+        let now = DateTime::parse_from_rfc3339("2026-03-01T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc);
+        let triplet = compute_race_triplet(&meetings, now).unwrap();
+        let countdown = crate::domain::CountdownTarget::NextSession {
+            session_name: "Practice 1".into(),
+            starts_at: DateTime::parse_from_rfc3339("2026-03-08T10:00:00Z")
+                .unwrap()
+                .with_timezone(&Utc),
+        };
+
+        assert_eq!(
+            season_phase(&triplet, &countdown),
+            SeasonPhase::PreSeason
+        );
+    }
+
+    #[test]
+    fn season_phase_complete_after_final_gp() {
+        let meetings = vec![
+            meeting(1, "2026-03-01T00:00:00Z", "2026-03-03T00:00:00Z"),
+            meeting(2, "2026-03-08T00:00:00Z", "2026-03-10T00:00:00Z"),
+        ];
+        let now = DateTime::parse_from_rfc3339("2026-12-01T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc);
+        let triplet = compute_race_triplet(&meetings, now).unwrap();
+
+        assert_eq!(
+            season_phase(&triplet, &crate::domain::CountdownTarget::SeasonComplete),
+            SeasonPhase::SeasonComplete
+        );
     }
 }

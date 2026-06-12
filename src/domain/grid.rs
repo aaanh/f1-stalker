@@ -53,6 +53,39 @@ pub fn quali_grid_visibility(
     }
 }
 
+pub fn find_sprint_qualifying<'a>(sessions: &'a [Session], meeting_key: i64) -> Option<&'a Session> {
+    sessions.iter().find(|session| {
+        session.meeting_key == meeting_key
+            && !session.is_cancelled
+            && session.session_name == "Sprint Qualifying"
+    })
+}
+
+pub fn sprint_grid_visibility(
+    has_pins: bool,
+    sprint_quali: Option<&Session>,
+    now: DateTime<Utc>,
+    grid_available: bool,
+) -> QualiGridVisibility {
+    if !has_pins {
+        return QualiGridVisibility::Hidden;
+    }
+
+    let Some(sprint_quali) = sprint_quali else {
+        return QualiGridVisibility::Hidden;
+    };
+
+    if !quali_has_ended(sprint_quali, now) {
+        return QualiGridVisibility::Hidden;
+    }
+
+    if grid_available {
+        QualiGridVisibility::Ready
+    } else {
+        QualiGridVisibility::Pending
+    }
+}
+
 pub fn build_grid_slots(grid: &[StartingGrid], pinned_numbers: &[i64]) -> Vec<GridSlot> {
     if grid.is_empty() || pinned_numbers.is_empty() {
         return Vec::new();

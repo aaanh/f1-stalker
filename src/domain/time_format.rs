@@ -20,6 +20,12 @@ pub fn format_fetched_at(dt: DateTime<Utc>) -> String {
     dt.with_timezone(&Local).format("%H:%M %Z").to_string()
 }
 
+pub fn format_fetched_at_long(dt: DateTime<Utc>) -> String {
+    dt.with_timezone(&Local)
+        .format("%a %d %b · %H:%M %Z")
+        .to_string()
+}
+
 fn parse_local(value: &str) -> DateTime<Local> {
     DateTime::parse_from_rfc3339(value)
         .map(|dt| dt.with_timezone(&Local))

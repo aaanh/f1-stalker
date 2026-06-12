@@ -2,7 +2,7 @@ use iced::Color;
 use openf1::Driver;
 
 use crate::db::PinnedDriver;
-use crate::ui::theme::MUTED;
+use crate::ui::theme::muted;
 
 pub const MAX_PINNED_DRIVERS: usize = 6;
 
@@ -23,7 +23,7 @@ pub fn driver_display_name(driver: &Driver) -> &str {
 pub fn team_colour(hex: &str) -> Color {
     let hex = hex.trim_start_matches('#');
     if hex.len() != 6 {
-        return MUTED;
+        return muted();
     }
 
     let parse = |start: usize| u8::from_str_radix(&hex[start..start + 2], 16).unwrap_or(128);

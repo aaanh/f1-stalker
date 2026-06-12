@@ -12,6 +12,13 @@ pub enum ChampionshipTab {
     Constructors,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ChartMode {
+    #[default]
+    Championship,
+    RaceStanding,
+}
+
 #[derive(Debug, Clone)]
 pub struct StandingPoint {
     pub round: u32,
@@ -34,6 +41,17 @@ pub struct ChampionshipRoundSnapshot {
     pub meeting_key: i64,
     pub drivers: Vec<DriverStandingSnapshot>,
     pub teams: Vec<TeamStandingSnapshot>,
+    pub race_results: Vec<RaceResultSnapshot>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RaceResultSnapshot {
+    pub driver_number: i64,
+    pub classified_position: i64,
+    pub dnf: bool,
+    pub dns: bool,
+    pub dsq: bool,
+    pub points: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -41,6 +59,7 @@ pub struct DriverStandingSnapshot {
     pub driver_number: i64,
     pub position: i64,
     pub points: i64,
+    pub race_points: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -48,6 +67,7 @@ pub struct TeamStandingSnapshot {
     pub team_name: String,
     pub position: i64,
     pub points: i64,
+    pub race_points: i64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -84,11 +104,77 @@ impl PositionAxis {
 #[derive(Debug, Clone)]
 pub struct ChampionshipCharts {
     pub round_count: u32,
-    pub driver_axis: PositionAxis,
-    pub constructor_axis: PositionAxis,
+    pub driver_championship_axis: PositionAxis,
+    pub constructor_championship_axis: PositionAxis,
+    pub driver_race_axis: PositionAxis,
+    pub constructor_race_axis: PositionAxis,
     pub round_labels: Vec<String>,
-    pub driver_series: Vec<ChartSeries>,
-    pub constructor_series: Vec<ChartSeries>,
+    pub driver_championship_series: Vec<ChartSeries>,
+    pub constructor_championship_series: Vec<ChartSeries>,
+    pub driver_race_series: Vec<ChartSeries>,
+    pub constructor_race_series: Vec<ChartSeries>,
+}
+
+pub fn classify_race_results(
+    rows: &[RaceResultInput],
+) -> Vec<RaceResultSnapshot> {
+    let mut finishers: Vec<&RaceResultInput> = rows
+        .iter()
+        .filter(|row| row.position.filter(|position| *position > 0).is_some())
+        .collect();
+    finishers.sort_by_key(|row| row.position.unwrap_or(i64::MAX));
+
+    let mut others: Vec<&RaceResultInput> = rows
+        .iter()
+        .filter(|row| row.position.filter(|position| *position > 0).is_none())
+        .collect();
+    others.sort_by(|left, right| {
+        right
+            .number_of_laps
+            .cmp(&left.number_of_laps)
+            .then_with(|| left.driver_number.cmp(&right.driver_number))
+    });
+
+    let mut classified = Vec::with_capacity(rows.len());
+    let mut max_finisher_position = 0i64;
+    for row in &finishers {
+        let position = row.position.unwrap_or(0);
+        max_finisher_position = max_finisher_position.max(position);
+        classified.push(RaceResultSnapshot {
+            driver_number: row.driver_number,
+            classified_position: position,
+            dnf: row.dnf,
+            dns: row.dns,
+            dsq: row.dsq,
+            points: row.points,
+        });
+    }
+
+    let mut next_position = max_finisher_position + 1;
+    for row in others {
+        classified.push(RaceResultSnapshot {
+            driver_number: row.driver_number,
+            classified_position: next_position,
+            dnf: row.dnf,
+            dns: row.dns,
+            dsq: row.dsq,
+            points: row.points,
+        });
+        next_position += 1;
+    }
+
+    classified
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct RaceResultInput {
+    pub driver_number: i64,
+    pub position: Option<i64>,
+    pub number_of_laps: i64,
+    pub dnf: bool,
+    pub dns: bool,
+    pub dsq: bool,
+    pub points: i64,
 }
 
 pub fn round_axis_labels(
@@ -179,16 +265,22 @@ pub fn build_championship_charts(
     roster: &[Driver],
     meetings: &[Meeting],
     sessions: &[Session],
+    focus_drivers: Option<&[i64]>,
 ) -> ChampionshipCharts {
+    let driver_numbers: Vec<i64> = match focus_drivers {
+        Some(numbers) => numbers.to_vec(),
+        None => pinned.iter().map(|pin| pin.driver_number).collect(),
+    };
+
     let round_count = rounds.len() as u32;
     let round_labels = round_axis_labels(rounds, meetings, sessions);
 
-    let driver_series = pinned
+    let driver_championship_series = driver_numbers
         .iter()
-        .filter_map(|pin| {
+        .filter_map(|driver_number| {
             roster
                 .iter()
-                .find(|driver| driver.driver_number == pin.driver_number)
+                .find(|driver| driver.driver_number == *driver_number)
                 .map(|driver| {
                     let points = rounds
                         .iter()
@@ -196,7 +288,7 @@ pub fn build_championship_charts(
                             round
                                 .drivers
                                 .iter()
-                                .find(|entry| entry.driver_number == pin.driver_number)
+                                .find(|entry| entry.driver_number == *driver_number)
                                 .map(|entry| StandingPoint {
                                     round: round.round,
                                     position: entry.position,
@@ -214,50 +306,145 @@ pub fn build_championship_charts(
         })
         .collect::<Vec<_>>();
 
-    let constructor_series = if let Some(latest) = rounds.last() {
-        let mut teams = latest.teams.clone();
-        teams.sort_by_key(|team| team.position);
-        teams
-            .into_iter()
-            .take(10)
-            .map(|team| {
-                let points = rounds
-                    .iter()
-                    .filter_map(|round| {
-                        round
-                            .teams
-                            .iter()
-                            .find(|entry| entry.team_name == team.team_name)
-                            .map(|entry| StandingPoint {
-                                round: round.round,
-                                position: entry.position,
-                                points: entry.points,
-                            })
-                    })
-                    .collect();
-                ChartSeries {
-                    label: team.team_name.clone(),
-                    code: constructor_code(&team.team_name),
-                    color: constructor_colour(&team.team_name, roster),
-                    points,
-                }
-            })
-            .collect()
-    } else {
-        Vec::new()
-    };
+    let driver_race_series = driver_numbers
+        .iter()
+        .filter_map(|driver_number| {
+            roster
+                .iter()
+                .find(|driver| driver.driver_number == *driver_number)
+                .map(|driver| {
+                    let points = rounds
+                        .iter()
+                        .filter_map(|round| {
+                            round
+                                .race_results
+                                .iter()
+                                .find(|result| result.driver_number == *driver_number)
+                                .map(|result| StandingPoint {
+                                    round: round.round,
+                                    position: result.classified_position,
+                                    points: result.points,
+                                })
+                        })
+                        .collect();
+                    ChartSeries {
+                        label: driver_display_name(driver).to_string(),
+                        code: driver.name_acronym.clone(),
+                        color: team_colour(&driver.team_colour),
+                        points,
+                    }
+                })
+        })
+        .collect::<Vec<_>>();
 
-    let driver_axis = PositionAxis::from_series(&driver_series);
-    let constructor_axis = PositionAxis::from_series(&constructor_series);
+    let (constructor_championship_series, constructor_race_series) =
+        constructor_series(rounds, roster);
 
     ChampionshipCharts {
         round_count,
-        driver_axis,
-        constructor_axis,
+        driver_championship_axis: PositionAxis::from_series(&driver_championship_series),
+        constructor_championship_axis: PositionAxis::from_series(&constructor_championship_series),
+        driver_race_axis: PositionAxis::from_series(&driver_race_series),
+        constructor_race_axis: PositionAxis::from_series(&constructor_race_series),
         round_labels,
-        driver_series,
-        constructor_series,
+        driver_championship_series,
+        constructor_championship_series,
+        driver_race_series,
+        constructor_race_series,
     }
+}
+
+fn constructor_series(
+    rounds: &[ChampionshipRoundSnapshot],
+    roster: &[Driver],
+) -> (Vec<ChartSeries>, Vec<ChartSeries>) {
+    let Some(latest) = rounds.last() else {
+        return (Vec::new(), Vec::new());
+    };
+
+    let mut teams = latest.teams.clone();
+    teams.sort_by_key(|team| team.position);
+    let top_teams: Vec<_> = teams.into_iter().take(10).collect();
+
+    let championship = top_teams
+        .iter()
+        .map(|team| {
+            let points = rounds
+                .iter()
+                .filter_map(|round| {
+                    round
+                        .teams
+                        .iter()
+                        .find(|entry| entry.team_name == team.team_name)
+                        .map(|entry| StandingPoint {
+                            round: round.round,
+                            position: entry.position,
+                            points: entry.points,
+                        })
+                })
+                .collect();
+            ChartSeries {
+                label: team.team_name.clone(),
+                code: constructor_code(&team.team_name),
+                color: constructor_colour(&team.team_name, roster),
+                points,
+            }
+        })
+        .collect();
+
+    let race = top_teams
+        .iter()
+        .map(|team| {
+            let points = rounds
+                .iter()
+                .filter_map(|round| {
+                    team_race_rank(round, &team.team_name).map(|position| {
+                        let race_points = round
+                            .teams
+                            .iter()
+                            .find(|entry| entry.team_name == team.team_name)
+                            .map(|entry| entry.race_points)
+                            .unwrap_or(0);
+                        StandingPoint {
+                            round: round.round,
+                            position,
+                            points: race_points,
+                        }
+                    })
+                })
+                .collect();
+            ChartSeries {
+                label: team.team_name.clone(),
+                code: constructor_code(&team.team_name),
+                color: constructor_colour(&team.team_name, roster),
+                points,
+            }
+        })
+        .collect();
+
+    (championship, race)
+}
+
+fn team_race_rank(round: &ChampionshipRoundSnapshot, team_name: &str) -> Option<i64> {
+    let mut ranked: Vec<_> = round
+        .teams
+        .iter()
+        .filter(|team| team.race_points > 0)
+        .collect();
+    if ranked.is_empty() {
+        ranked = round.teams.iter().collect();
+    }
+    ranked.sort_by(|left, right| {
+        right
+            .race_points
+            .cmp(&left.race_points)
+            .then_with(|| left.position.cmp(&right.position))
+    });
+
+    ranked
+        .iter()
+        .position(|team| team.team_name == team_name)
+        .map(|index| index as i64 + 1)
 }
 
 fn constructor_colour(team_name: &str, roster: &[Driver]) -> Color {
@@ -353,6 +540,22 @@ mod tests {
         assert_eq!(completed[0].1.meeting_key, 1);
     }
 
+    fn race_results_for_round(entries: &[(i64, i64, i64, bool)]) -> Vec<RaceResultSnapshot> {
+        let inputs: Vec<RaceResultInput> = entries
+            .iter()
+            .map(|(driver_number, position, points, dnf)| RaceResultInput {
+                driver_number: *driver_number,
+                position: Some(*position),
+                number_of_laps: if *dnf { 40 } else { 57 },
+                dnf: *dnf,
+                dns: false,
+                dsq: false,
+                points: *points,
+            })
+            .collect();
+        classify_race_results(&inputs)
+    }
+
     #[test]
     fn build_charts_for_pinned_drivers_and_top_constructors() {
         let rounds = vec![
@@ -365,11 +568,13 @@ mod tests {
                         driver_number: 1,
                         position: 2,
                         points: 18,
+                        race_points: 18,
                     },
                     DriverStandingSnapshot {
                         driver_number: 44,
                         position: 1,
                         points: 25,
+                        race_points: 25,
                     },
                 ],
                 teams: vec![
@@ -377,13 +582,16 @@ mod tests {
                         team_name: "Red Bull Racing".into(),
                         position: 1,
                         points: 43,
+                        race_points: 43,
                     },
                     TeamStandingSnapshot {
                         team_name: "Ferrari".into(),
                         position: 2,
                         points: 30,
+                        race_points: 30,
                     },
                 ],
+                race_results: race_results_for_round(&[(1, 2, 18, false), (44, 1, 25, false)]),
             },
             ChampionshipRoundSnapshot {
                 round: 2,
@@ -394,11 +602,13 @@ mod tests {
                         driver_number: 1,
                         position: 1,
                         points: 43,
+                        race_points: 25,
                     },
                     DriverStandingSnapshot {
                         driver_number: 44,
                         position: 3,
                         points: 33,
+                        race_points: 8,
                     },
                 ],
                 teams: vec![
@@ -406,13 +616,16 @@ mod tests {
                         team_name: "Red Bull Racing".into(),
                         position: 1,
                         points: 76,
+                        race_points: 33,
                     },
                     TeamStandingSnapshot {
                         team_name: "Ferrari".into(),
                         position: 2,
                         points: 55,
+                        race_points: 20,
                     },
                 ],
+                race_results: race_results_for_round(&[(1, 1, 25, false), (44, 3, 8, false)]),
             },
         ];
         let pinned = vec![PinnedDriver {
@@ -424,14 +637,101 @@ mod tests {
             sample_driver(44, "HAM", "Ferrari", "E80020"),
         ];
 
-        let charts = build_championship_charts(&rounds, &pinned, &roster, &[], &[]);
+        let charts = build_championship_charts(&rounds, &pinned, &roster, &[], &[], None);
         assert_eq!(charts.round_count, 2);
         assert_eq!(charts.round_labels, vec!["1", "2"]);
-        assert_eq!(charts.driver_axis, PositionAxis { min: 1, max: 2 });
-        assert_eq!(charts.driver_series.len(), 1);
-        assert_eq!(charts.driver_series[0].points.len(), 2);
-        assert_eq!(charts.constructor_series.len(), 2);
-        assert_eq!(charts.constructor_series[0].label, "Red Bull Racing");
+        assert_eq!(
+            charts.driver_championship_axis,
+            PositionAxis { min: 1, max: 2 }
+        );
+        assert_eq!(charts.driver_championship_series.len(), 1);
+        assert_eq!(charts.driver_championship_series[0].points.len(), 2);
+        assert_eq!(charts.driver_race_series.len(), 1);
+        assert_eq!(charts.driver_race_series[0].points.len(), 2);
+        assert_eq!(charts.constructor_championship_series.len(), 2);
+        assert_eq!(charts.constructor_championship_series[0].label, "Red Bull Racing");
+        assert_eq!(charts.constructor_race_series.len(), 2);
+    }
+
+    #[test]
+    fn race_standing_uses_finish_position_and_team_race_rank() {
+        let rounds = vec![ChampionshipRoundSnapshot {
+            round: 1,
+            session_key: 10,
+            meeting_key: 1,
+            drivers: vec![DriverStandingSnapshot {
+                driver_number: 1,
+                position: 2,
+                points: 18,
+                race_points: 12,
+            }],
+            teams: vec![
+                TeamStandingSnapshot {
+                    team_name: "Red Bull Racing".into(),
+                    position: 1,
+                    points: 43,
+                    race_points: 25,
+                },
+                TeamStandingSnapshot {
+                    team_name: "Ferrari".into(),
+                    position: 2,
+                    points: 30,
+                    race_points: 18,
+                },
+            ],
+            race_results: race_results_for_round(&[(1, 4, 12, false)]),
+        }];
+        let pinned = vec![PinnedDriver {
+            driver_number: 1,
+            sort_order: 0,
+        }];
+        let roster = vec![sample_driver(1, "VER", "Red Bull Racing", "3671C6")];
+
+        let charts = build_championship_charts(&rounds, &pinned, &roster, &[], &[], None);
+        assert_eq!(charts.driver_race_series[0].points[0].position, 4);
+        assert_eq!(charts.constructor_race_series[0].points[0].position, 1);
+        assert_eq!(charts.constructor_race_series[1].points[0].position, 2);
+    }
+
+    #[test]
+    fn classify_race_results_assigns_positions_after_dnf() {
+        let classified = classify_race_results(&[
+            RaceResultInput {
+                driver_number: 1,
+                position: Some(1),
+                number_of_laps: 57,
+                dnf: false,
+                dns: false,
+                dsq: false,
+                points: 25,
+            },
+            RaceResultInput {
+                driver_number: 30,
+                position: None,
+                number_of_laps: 46,
+                dnf: true,
+                dns: false,
+                dsq: false,
+                points: 0,
+            },
+            RaceResultInput {
+                driver_number: 5,
+                position: None,
+                number_of_laps: 45,
+                dnf: true,
+                dns: false,
+                dsq: false,
+                points: 0,
+            },
+        ]);
+
+        let by_driver: std::collections::HashMap<_, _> = classified
+            .iter()
+            .map(|result| (result.driver_number, result.classified_position))
+            .collect();
+        assert_eq!(by_driver[&1], 1);
+        assert_eq!(by_driver[&30], 2);
+        assert_eq!(by_driver[&5], 3);
     }
 
     fn sample_meeting(key: i64, name: &str) -> Meeting {
