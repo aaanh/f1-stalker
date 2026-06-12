@@ -1,4 +1,6 @@
 #[cfg(target_os = "macos")]
+mod macos_menu;
+#[cfg(target_os = "macos")]
 mod macos_platform;
 
 pub mod fonts;
@@ -8,7 +10,7 @@ use iced::widget::{column, image, row, text, Space};
 use iced::{Element, Length};
 
 use crate::state::Message;
-use crate::ui::theme::ACCENT;
+use crate::ui::theme::accent;
 
 pub const APP_DISPLAY_NAME: &str = "F1 Stalker";
 
@@ -41,6 +43,16 @@ pub fn apply_platform_branding() {
     macos_platform::try_apply(LOGO_DOCK);
 }
 
+#[cfg(target_os = "macos")]
+pub fn drain_menu_messages() -> Vec<Message> {
+    macos_menu::drain_messages()
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn drain_menu_messages() -> Vec<Message> {
+    Vec::new()
+}
+
 fn logo(size: f32, data: &'static [u8]) -> Element<'static, Message> {
     image(image::Handle::from_bytes(Bytes::from_static(data)))
         .width(Length::Fixed(size))
@@ -53,7 +65,7 @@ pub fn title_bar_brand() -> Element<'static, Message> {
     row![
         logo(22.0, LOGO_TITLE_BAR),
         Space::with_width(8),
-        text(APP_DISPLAY_NAME).size(14).color(ACCENT),
+        text(APP_DISPLAY_NAME).size(14).color(accent()),
     ]
     .align_y(iced::Alignment::Center)
     .into()
@@ -63,7 +75,7 @@ pub fn boot_brand() -> Element<'static, Message> {
     column![
         logo(72.0, LOGO_BOOT),
         Space::with_height(12),
-        text(APP_DISPLAY_NAME).size(28).color(ACCENT),
+        text(APP_DISPLAY_NAME).size(28).color(accent()),
     ]
     .align_x(iced::Alignment::Center)
     .into()
@@ -73,7 +85,7 @@ pub fn about_brand() -> Element<'static, Message> {
     column![
         logo(64.0, LOGO_ABOUT),
         Space::with_height(8),
-        text(APP_DISPLAY_NAME).size(22).color(ACCENT),
+        text(APP_DISPLAY_NAME).size(22).color(accent()),
     ]
     .align_x(iced::Alignment::Center)
     .width(Length::Fill)
@@ -84,7 +96,7 @@ pub fn header_brand() -> Element<'static, Message> {
     row![
         logo(36.0, LOGO_BOOT),
         Space::with_width(12),
-        text(APP_DISPLAY_NAME).size(30).color(ACCENT),
+        text(APP_DISPLAY_NAME).size(30).color(accent()),
     ]
     .align_y(iced::Alignment::Center)
     .into()

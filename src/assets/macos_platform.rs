@@ -7,6 +7,8 @@ use objc2_app_kit::{
 use objc2_foundation::{ns_string, MainThreadMarker, NSProcessInfo, NSSize, NSString};
 
 use super::APP_DISPLAY_NAME;
+#[cfg(target_os = "macos")]
+use super::macos_menu;
 use crate::debug;
 
 const STATUS_TRY: u8 = 0;
@@ -57,6 +59,7 @@ fn apply_once(png_bytes: &'static [u8]) -> PlatformAttempt {
     }
 
     apply_app_name(&app);
+    macos_menu::setup_menus(&app, mtm);
     set_dock_icon(png_bytes, &app);
 
     PlatformAttempt::Done
