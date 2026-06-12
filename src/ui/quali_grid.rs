@@ -1,6 +1,7 @@
 use iced::widget::{column, container, row, text, Space};
 use iced::{Element, Length};
 
+use crate::data::grid::QualiGridData;
 use crate::domain::{
     driver_display_name, format_gap_to_pole, format_grid_position, pinned_driver_views,
     QualiGridVisibility,
@@ -8,39 +9,70 @@ use crate::domain::{
 use crate::state::{AppState, Message};
 use crate::ui::icons::{section_heading, Icon};
 use crate::ui::layout::LayoutConfig;
-use crate::ui::theme::{BORDER, FLAG_GREEN, MUTED, SURFACE, TEXT};
+use crate::ui::theme::{border, FLAG_GREEN, muted, surface, text_color};
+
+pub fn sprint_grid_section(state: &AppState, layout: LayoutConfig) -> Option<Element<'_, Message>> {
+    match state.sprint_visibility() {
+        QualiGridVisibility::Hidden => None,
+        QualiGridVisibility::Pending => Some(pending_panel_with_title(
+            layout,
+            "Sprint starting grid",
+        )),
+        QualiGridVisibility::Ready => Some(ready_panel_with_title(
+            state,
+            layout,
+            "Sprint starting grid",
+            |data| data.sprint_grid.as_ref(),
+        )),
+    }
+}
 
 pub fn quali_grid_section(state: &AppState, layout: LayoutConfig) -> Option<Element<'_, Message>> {
     match state.quali_visibility() {
         QualiGridVisibility::Hidden => None,
-        QualiGridVisibility::Pending => Some(pending_panel(layout)),
-        QualiGridVisibility::Ready => Some(ready_panel(state, layout)),
+        QualiGridVisibility::Pending => {
+            Some(pending_panel_with_title(layout, "Qualifying grid"))
+        }
+        QualiGridVisibility::Ready => Some(ready_panel_with_title(
+            state,
+            layout,
+            "Qualifying grid",
+            |data| data.quali_grid.as_ref(),
+        )),
     }
 }
 
-fn pending_panel(layout: LayoutConfig) -> Element<'static, Message> {
+fn pending_panel_with_title(layout: LayoutConfig, title: &'static str) -> Element<'static, Message> {
     panel_shell(
         column![
-            section_heading(Icon::Trophy, "Qualifying grid", None),
+            section_heading(Icon::Trophy, title, None),
             text("Grid not available yet")
                 .size(layout.card_detail_size)
-                .color(MUTED),
+                .color(muted()),
         ]
         .spacing(8)
         .width(Length::Fill),
     )
 }
 
-fn ready_panel(state: &AppState, layout: LayoutConfig) -> Element<'_, Message> {
+fn ready_panel_with_title<'a, F>(
+    state: &'a AppState,
+    layout: LayoutConfig,
+    title: &'static str,
+    grid_for: F,
+) -> Element<'a, Message>
+where
+    F: Fn(&crate::data::WeekendDetailData) -> Option<&QualiGridData>,
+{
     let roster = state.drivers_roster().unwrap_or(&[]);
     let views = pinned_driver_views(&state.pinned_drivers, roster);
     let slots = state
         .weekend_data()
-        .and_then(|data| data.quali_grid.as_ref())
+        .and_then(grid_for)
         .map(|grid| grid.slots.as_slice())
         .unwrap_or(&[]);
 
-    let mut rows = column![section_heading(Icon::Trophy, "Qualifying grid", None)].spacing(8);
+    let mut rows = column![section_heading(Icon::Trophy, title, None)].spacing(8);
     let mut rendered = 0usize;
 
     for view in views {
@@ -52,19 +84,15 @@ fn ready_panel(state: &AppState, layout: LayoutConfig) -> Element<'_, Message> {
         };
 
         let position = format_grid_position(slot.position);
-        let gap = format_gap_to_pole(slot.gap_to_pole_secs)
-            .unwrap_or_else(|| "—".into());
-
+        let gap = format_gap_to_pole(slot.gap_to_pole_secs).unwrap_or_else(|| "—".into());
         let name = driver_display_name(&view.driver).to_string();
         rendered += 1;
         rows = rows.push(
             row![
-                text(name)
-                    .size(13)
-                    .color(TEXT),
+                text(name).size(13).color(text_color()),
                 Space::with_width(Length::Fill),
                 text(position).size(13).color(FLAG_GREEN),
-                text(gap).size(12).color(MUTED),
+                text(gap).size(12).color(muted()),
             ]
             .align_y(iced::Alignment::Center)
             .width(Length::Fill),
@@ -72,7 +100,7 @@ fn ready_panel(state: &AppState, layout: LayoutConfig) -> Element<'_, Message> {
     }
 
     if rendered == 0 {
-        return pending_panel(layout);
+        return pending_panel_with_title(layout, title);
     }
 
     panel_shell(rows.width(Length::Fill))
@@ -83,9 +111,9 @@ fn panel_shell<'a>(content: iced::widget::Column<'a, Message>) -> Element<'a, Me
         .padding(12)
         .width(Length::Fill)
         .style(|_| container::Style {
-            background: Some(SURFACE.into()),
+            background: Some(surface().into()),
             border: iced::Border {
-                color: BORDER,
+                color: border(),
                 width: 1.0,
                 radius: 8.0.into(),
             },

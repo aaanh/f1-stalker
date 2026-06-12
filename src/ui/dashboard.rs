@@ -4,14 +4,16 @@ use iced::{Element, Length, Padding};
 use openf1::Meeting;
 
 use crate::domain::{
-    circuit_image_url, countdown_segments, countdown_segments_pending,
-    countdown_segments_zero, format_meeting_date_range, format_session_start, CountdownSegment,
-    CountdownTarget, RaceTripletSlot,
+    build_championship_narrative, build_season_complete_narrative, circuit_image_url,
+    countdown_segments, countdown_segments_pending, countdown_segments_zero,
+    format_fetched_at_long, format_meeting_date_range, format_session_start, season_phase,
+    CountdownSegment, CountdownTarget, RaceTripletSlot, SeasonPhase,
 };
 use crate::state::{AppState, LoadState, Message};
 use crate::ui::components::action_button_icon;
 use crate::ui::icons::Icon;
 use crate::ui::pinned_drivers::pinned_drivers_section;
+use crate::ui::rival_mode::rival_section;
 use crate::ui::weather_panel::meeting_weather_panel;
 use crate::ui::championship_charts::championship_charts_section;
 use crate::ui::decals::{
@@ -20,18 +22,12 @@ use crate::ui::decals::{
 use crate::ui::fonts::MONO;
 use crate::ui::layout::LayoutConfig;
 use crate::ui::scroll::scrollable_page;
-use crate::ui::theme::{ACCENT, BORDER, FLAG_BLUE, FLAG_GREEN, FLAG_YELLOW, MUTED, SURFACE};
+use crate::ui::theme::{
+    accent, border, FLAG_BLUE, FLAG_GREEN, FLAG_YELLOW, muted, surface, text_color,
+};
 
 pub fn dashboard(state: &AppState, layout: LayoutConfig) -> Element<'_, Message> {
-    let footer = if state.is_stale() {
-        text("Showing cached data · OpenF1 (approx. 24h delay)")
-            .size(12)
-            .color(FLAG_YELLOW)
-    } else {
-        text("Data via OpenF1 (approx. 24h delay)")
-            .size(12)
-            .color(MUTED)
-    };
+    let footer = data_footer(state);
 
     let body = main_body(state, layout);
 
@@ -57,7 +53,9 @@ fn main_body(state: &AppState, layout: LayoutConfig) -> Element<'_, Message> {
 
     column![
         calendar_section(state, layout),
+        rival_section(state),
         pinned_drivers_section(state, layout),
+        championship_narrative_banner(state),
         championship_charts_section(state),
     ]
     .spacing(spacing)
@@ -69,7 +67,7 @@ fn main_body(state: &AppState, layout: LayoutConfig) -> Element<'_, Message> {
 fn calendar_section(state: &AppState, layout: LayoutConfig) -> Element<'_, Message> {
     match &state.load {
         LoadState::Loading => column![
-            text("Loading season calendar…").color(MUTED),
+            text("Loading season calendar…").color(muted()),
             Space::with_height(16),
             skeleton_cards(layout),
         ]
@@ -77,24 +75,29 @@ fn calendar_section(state: &AppState, layout: LayoutConfig) -> Element<'_, Messa
         .width(Length::Fill)
         .height(Length::Shrink)
         .into(),
-        LoadState::Error { message, .. } => column![
+        LoadState::Error { message, cached: None } => column![
             signal_flag(FlagSignal::Alert, "RED"),
             text("Could not load calendar").size(18),
-            text(message).color(MUTED),
+            text(message).color(muted()),
             action_button_icon(Some(Icon::Refresh), "Retry", Message::Refresh),
         ]
         .spacing(8)
         .width(Length::Fill)
         .height(Length::Shrink)
         .into(),
-        LoadState::Ready(_) => column![
-            countdown_hero(state, layout),
-            race_cards(state, state.animation_phase, layout),
-        ]
-        .spacing(if layout.viewport.height < 720.0 { 12 } else { 16 })
-        .width(Length::Fill)
-        .height(Length::Shrink)
-        .into(),
+        LoadState::Ready(_) | LoadState::Error { cached: Some(_), .. } => {
+            let mut section = column![].spacing(if layout.viewport.height < 720.0 {
+                12
+            } else {
+                16
+            });
+            if let Some(banner) = season_banner(state) {
+                section = section.push(banner);
+            }
+            section = section.push(countdown_hero(state, layout));
+            section = section.push(race_cards(state, state.animation_phase, layout));
+            section.width(Length::Fill).height(Length::Shrink).into()
+        }
     }
 }
 
@@ -120,7 +123,7 @@ fn countdown_hero(state: &AppState, layout: LayoutConfig) -> Element<'_, Message
             countdown_segments_pending(),
         ),
         CountdownTarget::SeasonComplete => (
-            "SEASON COMPLETE".into(),
+            "OFF-SEASON · Season complete".into(),
             countdown_segments_zero(),
         ),
     };
@@ -138,13 +141,13 @@ fn countdown_hero(state: &AppState, layout: LayoutConfig) -> Element<'_, Message
             row![
                 signal_flag(FlagSignal::Alert, "LIGHTS OUT"),
                 Space::with_width(Length::Fill),
-                text(session_label).size(13).color(MUTED),
+                text(session_label).size(13).color(muted()),
             ]
             .align_y(iced::Alignment::Center),
             countdown_clock(timer_segments, layout),
             row![
                 text("T-").size(14).color(FLAG_YELLOW),
-                text("COUNTDOWN").size(12).color(MUTED),
+                text("COUNTDOWN").size(12).color(muted()),
             ]
             .spacing(4)
             .align_y(iced::Alignment::Center),
@@ -155,16 +158,16 @@ fn countdown_hero(state: &AppState, layout: LayoutConfig) -> Element<'_, Message
     .padding(hero_padding)
     .width(Length::Fill)
     .style(move |_| container::Style {
-        background: Some(SURFACE.into()),
+        background: Some(surface().into()),
         border: iced::Border {
-            color: ACCENT,
+            color: accent(),
             width: 2.0,
             radius: 10.0.into(),
         },
         shadow: iced::Shadow {
             color: iced::Color {
                 a: 0.35,
-                ..ACCENT
+                ..accent()
             },
             offset: iced::Vector::new(0.0, 4.0),
             blur_radius: 16.0,
@@ -190,7 +193,7 @@ fn countdown_clock(segments: Vec<CountdownSegment>, layout: LayoutConfig) -> Ele
                     text(separator)
                         .size(value_size)
                         .font(MONO)
-                        .color(ACCENT),
+                        .color(accent()),
                 )
                 .padding(Padding {
                     top: 0.0,
@@ -206,10 +209,10 @@ fn countdown_clock(segments: Vec<CountdownSegment>, layout: LayoutConfig) -> Ele
                 text(segment.value)
                     .size(value_size)
                     .font(MONO)
-                    .color(ACCENT),
+                    .color(accent()),
                 text(segment.label)
                     .size(label_size)
-                    .color(MUTED),
+                    .color(muted()),
             ]
             .spacing(2)
             .align_x(iced::Alignment::Center),
@@ -290,7 +293,7 @@ fn race_card<'a>(
     };
 
     let (border_color, border_width) = match mode {
-        CardMode::Previous => (BORDER, 1.0),
+        CardMode::Previous => (border(), 1.0),
         CardMode::Live => (FLAG_GREEN, 2.0),
         CardMode::Intermission => (FLAG_YELLOW, 2.0),
         CardMode::Upcoming => (FLAG_GREEN, 1.5),
@@ -298,7 +301,7 @@ fn race_card<'a>(
 
     let status = match mode {
         CardMode::Previous => None,
-        CardMode::Live => Some(signal_flag_sized(FlagSignal::Live, "LIVE", layout.card_detail_size)),
+        CardMode::Live => Some(signal_flag_sized(FlagSignal::Live, "live()", layout.card_detail_size)),
         CardMode::Intermission => {
             Some(signal_flag_sized(FlagSignal::Intermission, "SC", layout.card_detail_size))
         }
@@ -320,13 +323,13 @@ fn race_card<'a>(
                 meeting_header(state, m, layout),
                 text(&m.circuit_short_name)
                     .size(layout.card_body_size)
-                    .color(MUTED),
+                    .color(muted()),
                 text(format!("{}, {}", m.location, m.country_name))
                     .size(layout.card_detail_size)
-                    .color(MUTED),
+                    .color(muted()),
                 text(format_date_range(m))
                     .size(layout.card_detail_size)
-                    .color(MUTED),
+                    .color(muted()),
                 meeting_weather_panel(state, m, layout),
                 track_outline(state, m, layout),
             ]
@@ -338,7 +341,7 @@ fn race_card<'a>(
                 card_header(heading, status, layout),
                 text("No previous round")
                     .size(layout.card_body_size)
-                    .color(MUTED),
+                    .color(muted()),
             ]
             .spacing(8),
             layout,
@@ -350,7 +353,7 @@ fn race_card<'a>(
         .width(layout.card_width)
         .height(layout.card_height())
         .style(move |_| container::Style {
-            background: Some(SURFACE.into()),
+            background: Some(surface().into()),
             border: iced::Border {
                 color: border_color,
                 width: border_width,
@@ -366,10 +369,12 @@ fn intermission_subtitle(state: &AppState) -> &'static str {
         return "Next session on the clock";
     };
 
-    if data.triplet.previous.is_none() {
-        "Pre-season · Next race weekend on the calendar"
-    } else {
-        "Off-weekend · Next session on the clock"
+    match season_phase(&data.triplet, &data.countdown) {
+        SeasonPhase::PreSeason => "Pre-season · Next race weekend on the calendar",
+        SeasonPhase::SeasonComplete => "Season complete · Final round in the rear-view",
+        SeasonPhase::OffWeekend | SeasonPhase::RaceWeekend => {
+            "Off-weekend · Next session on the clock"
+        }
     }
 }
 
@@ -378,7 +383,7 @@ fn card_header<'a>(
     status: Option<Element<'a, Message>>,
     layout: LayoutConfig,
 ) -> Element<'a, Message> {
-    let heading = text(heading).size(layout.card_heading_size).color(MUTED);
+    let heading = text(heading).size(layout.card_heading_size).color(muted());
 
     match status {
         Some(status) => row![heading, Space::with_width(Length::Fill), status]
@@ -433,7 +438,7 @@ fn country_flag<'a>(
         .padding(2)
         .style(|_| container::Style {
             border: iced::Border {
-                color: BORDER,
+                color: border(),
                 width: 1.0,
                 radius: 4.0.into(),
             },
@@ -449,9 +454,9 @@ fn country_flag<'a>(
     )
     .padding([8, 10])
     .style(|_| container::Style {
-        background: Some(SURFACE.into()),
+        background: Some(surface().into()),
         border: iced::Border {
-            color: BORDER,
+            color: border(),
             width: 1.0,
             radius: 4.0.into(),
         },
@@ -491,14 +496,14 @@ fn track_outline<'a>(
         container(
             text("…")
                 .size(layout.card_detail_size)
-                .color(MUTED),
+                .color(muted()),
         )
         .center_x(height)
         .width(Length::Fill)
         .height(Length::Fixed(height))
         .style(|_| container::Style {
             border: iced::Border {
-                color: BORDER,
+                color: border(),
                 width: 1.0,
                 radius: 6.0.into(),
             },
@@ -515,14 +520,14 @@ fn track_map_not_found(layout: LayoutConfig, height: f32) -> Element<'static, Me
         container(
             text("Map not found")
                 .size(layout.card_detail_size)
-                .color(MUTED),
+                .color(muted()),
         )
         .center_x(height)
         .width(Length::Fill)
         .height(Length::Fixed(height))
         .style(|_| container::Style {
             border: iced::Border {
-                color: BORDER,
+                color: border(),
                 width: 1.0,
                 radius: 6.0.into(),
             },
@@ -551,8 +556,8 @@ fn skeleton_cards(layout: LayoutConfig) -> Element<'static, Message> {
 fn skeleton_card(layout: LayoutConfig) -> Element<'static, Message> {
     container(
         column![
-            text("…").color(MUTED),
-            text("Loading").color(MUTED),
+            text("…").color(muted()),
+            text("Loading").color(muted()),
         ]
         .spacing(8),
     )
@@ -560,9 +565,9 @@ fn skeleton_card(layout: LayoutConfig) -> Element<'static, Message> {
     .width(layout.card_width)
     .height(layout.card_height())
     .style(|_| container::Style {
-        background: Some(SURFACE.into()),
+        background: Some(surface().into()),
         border: iced::Border {
-            color: BORDER,
+            color: border(),
             width: 1.0,
             radius: 8.0.into(),
         },
@@ -573,4 +578,115 @@ fn skeleton_card(layout: LayoutConfig) -> Element<'static, Message> {
 
 fn format_date_range(meeting: &Meeting) -> String {
     format_meeting_date_range(&meeting.date_start, &meeting.date_end)
+}
+
+fn season_banner(state: &AppState) -> Option<Element<'static, Message>> {
+    let phase = state.season_phase()?;
+    let (title, detail) = match phase {
+        SeasonPhase::PreSeason => (
+            "Pre-season",
+            "No race weekend is active yet. The cards below show the first Grand Prix on the calendar.",
+        ),
+        SeasonPhase::SeasonComplete => (
+            "Off-season",
+            "The season is over. Standings and grids may still update for about 24 hours after the final race.",
+        ),
+        SeasonPhase::OffWeekend | SeasonPhase::RaceWeekend => return None,
+    };
+
+    Some(
+        container(
+            column![
+                row![
+                    signal_flag(FlagSignal::Intermission, title),
+                    Space::with_width(Length::Fill),
+                ],
+                text(detail).size(13).color(muted()),
+            ]
+            .spacing(8)
+            .width(Length::Fill),
+        )
+        .padding(12)
+        .width(Length::Fill)
+        .style(|_| container::Style {
+            background: Some(surface().into()),
+            border: iced::Border {
+                color: FLAG_YELLOW,
+                width: 1.0,
+                radius: 8.0.into(),
+            },
+            ..Default::default()
+        })
+        .into(),
+    )
+}
+
+fn championship_narrative_banner(state: &AppState) -> Element<'_, Message> {
+    if state.rival_compare_active() {
+        return Space::new(Length::Shrink, Length::Fixed(0.0)).into();
+    }
+
+    let Some(data) = state.championship_data() else {
+        return Space::new(Length::Shrink, Length::Fixed(0.0)).into();
+    };
+
+    if data.rounds.is_empty() {
+        return Space::new(Length::Shrink, Length::Fixed(0.0)).into();
+    }
+
+    let roster = state.drivers_roster().unwrap_or(&[]);
+    let narrative = match state.season_phase() {
+        Some(SeasonPhase::SeasonComplete) => {
+            build_season_complete_narrative(&data.rounds, roster)
+        }
+        _ => build_championship_narrative(&data.rounds, roster),
+    };
+
+    let Some(narrative) = narrative else {
+        return Space::new(Length::Shrink, Length::Fixed(0.0)).into();
+    };
+
+    container(
+        column![
+            text(narrative.headline).size(16).color(text_color()),
+            text(narrative.detail).size(12).color(muted()),
+        ]
+        .spacing(4)
+        .width(Length::Fill),
+    )
+    .padding(12)
+    .width(Length::Fill)
+    .style(|_| container::Style {
+        background: Some(surface().into()),
+        border: iced::Border {
+            color: border(),
+            width: 1.0,
+            radius: 8.0.into(),
+        },
+        ..Default::default()
+    })
+    .into()
+}
+
+fn data_footer(state: &AppState) -> Element<'static, Message> {
+    let delay = "OpenF1 (approx. 24h delay)";
+    let updated = state
+        .last_fetched_at()
+        .map(format_fetched_at_long)
+        .unwrap_or_else(|| "unknown".into());
+
+    let label = if state.is_any_stale() {
+        format!("Showing cached data · last updated {updated} · {delay}")
+    } else {
+        format!("Data via {delay} · Updated {updated}")
+    };
+
+    text(label)
+        .size(12)
+        .color(if state.is_any_stale() {
+            FLAG_YELLOW
+        } else {
+            muted()
+        })
+        .into()
 }

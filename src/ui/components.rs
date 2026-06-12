@@ -3,7 +3,7 @@ use iced::{Background, Color, Element, Length};
 
 use crate::state::{Message, Screen};
 use crate::ui::icons::{icon, Icon};
-use crate::ui::theme::{ACCENT, BORDER, MUTED, SURFACE, TEXT};
+use crate::ui::theme::{accent, border, muted, surface, text_color};
 
 const GROUP_RADIUS: f32 = 6.0;
 const SEGMENT_RADIUS: f32 = 4.0;
@@ -79,10 +79,10 @@ pub fn action_button_icon(
     label: &'static str,
     message: Message,
 ) -> Element<'static, Message> {
-    button(button_label(icon_kind, label, TEXT))
+    button(button_label(icon_kind, label, text_color()))
         .padding([10, 16])
         .on_press(message)
-        .style(|_, status| standalone_button_style(status, ACCENT, TEXT, ACCENT))
+        .style(|_, status| standalone_button_style(status, accent(), text_color(), accent()))
         .into()
 }
 
@@ -95,7 +95,7 @@ pub fn secondary_button_icon(
     label: &'static str,
     message: Message,
 ) -> Element<'static, Message> {
-    button(button_label(icon_kind, label, TEXT))
+    button(button_label(icon_kind, label, text_color()))
         .padding([8, 14])
         .on_press(message)
         .style(|_, status| {
@@ -103,29 +103,29 @@ pub fn secondary_button_icon(
             let (background, text_color, border_color) = match status {
                 Active => (
                     Background::Color(Color::TRANSPARENT),
-                    TEXT,
-                    BORDER,
+                    text_color(),
+                    border(),
                 ),
                 Hovered => (
                     Background::Color(iced::Color {
                         a: 0.35,
-                        ..SURFACE
+                        ..surface()
                     }),
-                    TEXT,
-                    ACCENT,
+                    text_color(),
+                    accent(),
                 ),
                 Pressed => (
                     Background::Color(iced::Color {
                         a: 0.55,
-                        ..SURFACE
+                        ..surface()
                     }),
-                    TEXT,
-                    ACCENT,
+                    text_color(),
+                    accent(),
                 ),
                 Disabled => (
                     Background::Color(Color::TRANSPARENT),
-                    Color { a: 0.45, ..MUTED },
-                    BORDER,
+                    Color { a: 0.45, ..muted() },
+                    border(),
                 ),
             };
             button::Style {
@@ -158,9 +158,9 @@ pub fn section_card_icon<'a>(
         .padding(16)
         .width(Length::Fill)
         .style(|_| container::Style {
-            background: Some(SURFACE.into()),
+            background: Some(surface().into()),
             border: iced::Border {
-                color: BORDER,
+                color: border(),
                 width: 1.0,
                 radius: 8.0.into(),
             },
@@ -193,13 +193,13 @@ fn column_section<'a>(
 ) -> Element<'a, Message> {
     let title_row: Element<'a, Message> = match icon_kind {
         Some(kind) => row![
-            icon(kind, 16.0, TEXT),
-            text(title).size(15).color(TEXT),
+            icon(kind, 16.0, text_color()),
+            text(title).size(15).color(text_color()),
         ]
         .spacing(8)
         .align_y(iced::Alignment::Center)
         .into(),
-        None => text(title).size(15).color(TEXT).into(),
+        None => text(title).size(15).color(text_color()).into(),
     };
 
     iced::widget::column![title_row, Space::with_height(12), body]
@@ -214,7 +214,7 @@ pub fn modal_card(
 ) -> Element<'static, Message> {
     container(
         iced::widget::column![
-            text(title).size(18).color(TEXT),
+            text(title).size(18).color(text_color()),
             Space::with_height(12),
             body,
             Space::with_height(16),
@@ -226,9 +226,9 @@ pub fn modal_card(
     .padding(20)
     .width(Length::Fixed(420.0))
     .style(|_| container::Style {
-        background: Some(SURFACE.into()),
+        background: Some(surface().into()),
         border: iced::Border {
-            color: BORDER,
+            color: border(),
             width: 1.0,
             radius: 10.0.into(),
         },
@@ -261,9 +261,9 @@ fn button_group(segments: std::vec::Vec<Element<'static, Message>>) -> Element<'
     )
     .padding(1)
     .style(|_| container::Style {
-        background: Some(SURFACE.into()),
+        background: Some(surface().into()),
         border: iced::Border {
-            color: BORDER,
+            color: border(),
             width: 1.0,
             radius: GROUP_RADIUS.into(),
         },
@@ -277,7 +277,7 @@ fn group_divider() -> Element<'static, Message> {
         .width(Length::Fixed(1.0))
         .height(Length::Fixed(28.0))
         .style(|_| container::Style {
-            background: Some(BORDER.into()),
+            background: Some(border().into()),
             ..Default::default()
         })
         .into()
@@ -292,7 +292,7 @@ fn nav_tab_segment(
 ) -> Element<'static, Message> {
     let selected = screen == active;
     let radius = segment_radius(position);
-    let tab_color = if selected { TEXT } else { MUTED };
+    let tab_color = if selected { text_color() } else { muted() };
 
     button(button_label(Some(icon_kind), label, tab_color))
         .padding([8, 14])
@@ -312,7 +312,7 @@ fn danger_button_segment(
 ) -> Element<'static, Message> {
     let radius = segment_radius(position);
 
-    button(button_label(Some(icon_kind), label, ACCENT))
+    button(button_label(Some(icon_kind), label, accent()))
         .padding([10, 16])
         .on_press(message)
         .style(move |_, status| {
@@ -331,7 +331,7 @@ fn icon_button_segment(
 ) -> Element<'static, Message> {
     let radius = segment_radius(position);
 
-    button(icon(icon_kind, icon_size, MUTED))
+    button(icon(icon_kind, icon_size, muted()))
         .padding(padding)
         .on_press(message)
         .style(move |_, status| {
@@ -398,7 +398,7 @@ fn standalone_button_style(
             Background::Color(Color { a: 0.35, ..fill }),
             Color { a: 0.45, ..label },
             iced::Border {
-                color: BORDER,
+                color: border(),
                 width: 1.0,
                 radius: GROUP_RADIUS.into(),
             },
@@ -417,13 +417,13 @@ fn nav_segment_colors(selected: bool, status: button::Status) -> (Background, Co
     use button::Status::{Active, Disabled, Hovered, Pressed};
 
     match (selected, status) {
-        (true, Active) => (tint(ACCENT, 0.24), TEXT),
-        (true, Hovered) => (tint(ACCENT, 0.38), TEXT),
-        (true, Pressed) => (tint(ACCENT, 0.50), TEXT),
-        (false, Active) => (Background::Color(Color::TRANSPARENT), MUTED),
-        (false, Hovered) => (tint(SURFACE, 0.75), TEXT),
-        (false, Pressed) => (tint(SURFACE, 0.95), TEXT),
-        (_, Disabled) => (Background::Color(Color::TRANSPARENT), MUTED),
+        (true, Active) => (tint(accent(), 0.24), text_color()),
+        (true, Hovered) => (tint(accent(), 0.38), text_color()),
+        (true, Pressed) => (tint(accent(), 0.50), text_color()),
+        (false, Active) => (Background::Color(Color::TRANSPARENT), muted()),
+        (false, Hovered) => (tint(surface(), 0.75), text_color()),
+        (false, Pressed) => (tint(surface(), 0.95), text_color()),
+        (_, Disabled) => (Background::Color(Color::TRANSPARENT), muted()),
     }
 }
 
@@ -431,10 +431,10 @@ fn danger_segment_colors(status: button::Status) -> (Background, Color) {
     use button::Status::{Active, Disabled, Hovered, Pressed};
 
     match status {
-        Active => (Background::Color(Color::TRANSPARENT), ACCENT),
-        Hovered => (tint(ACCENT, 0.18), TEXT),
-        Pressed => (tint(ACCENT, 0.32), TEXT),
-        Disabled => (Background::Color(Color::TRANSPARENT), Color { a: 0.45, ..ACCENT }),
+        Active => (Background::Color(Color::TRANSPARENT), accent()),
+        Hovered => (tint(accent(), 0.18), text_color()),
+        Pressed => (tint(accent(), 0.32), text_color()),
+        Disabled => (Background::Color(Color::TRANSPARENT), Color { a: 0.45, ..accent() }),
     }
 }
 
@@ -442,10 +442,10 @@ fn icon_segment_colors(status: button::Status) -> (Background, Color) {
     use button::Status::{Active, Disabled, Hovered, Pressed};
 
     match status {
-        Active => (Background::Color(Color::TRANSPARENT), MUTED),
-        Hovered => (tint(SURFACE, 0.85), TEXT),
-        Pressed => (tint(SURFACE, 1.0), TEXT),
-        Disabled => (Background::Color(Color::TRANSPARENT), Color { a: 0.45, ..MUTED }),
+        Active => (Background::Color(Color::TRANSPARENT), muted()),
+        Hovered => (tint(surface(), 0.85), text_color()),
+        Pressed => (tint(surface(), 1.0), text_color()),
+        Disabled => (Background::Color(Color::TRANSPARENT), Color { a: 0.45, ..muted() }),
     }
 }
 

@@ -1,6 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
+use chrono::{DateTime, Utc};
 use iced::widget::image;
+use iced::widget::scrollable::RelativeOffset;
 use iced::window;
 use iced::{Color, Size};
 use openf1::Driver;
@@ -10,7 +12,7 @@ use crate::data::ChampionshipData;
 use crate::data::DriversData;
 use crate::data::WeekendDetailData;
 use crate::domain::QualiGridVisibility;
-use crate::domain::{ChampionshipTab, DriverPickerFilters, DriverSortField, PinDirection, SortDirection};
+use crate::domain::{ChampionshipTab, ChartMode, DriverPickerFilters, DriverSortField, PinDirection, SeasonPhase};
 use crate::db::{PinnedDriver, Settings};
 
 pub mod bootstrap;
@@ -66,6 +68,7 @@ pub enum WindowAction {
     Close,
     Minimize,
     Maximize,
+    Fullscreen,
     Drag,
 }
 
@@ -127,6 +130,7 @@ pub struct AppState {
     pub championship: ChampionshipLoadState,
     pub weekend: WeekendLoadState,
     pub championship_tab: ChampionshipTab,
+    pub championship_chart_mode: ChartMode,
     pub settings: Settings,
     pub pinned_drivers: Vec<PinnedDriver>,
     pub refreshing: bool,
@@ -141,9 +145,14 @@ pub struct AppState {
     pub asset_fetch_failed: HashSet<String>,
     pub viewport: Size,
     pub driver_picker: DriverPickerFilters,
+    pub driver_picker_scroll: RelativeOffset,
     pub scrollbar_visible: ScrollbarVisibility,
     pub boot: BootState,
     pub chart_tooltip: Option<ChartTooltip>,
+    pub title_bar_controls_hover: bool,
+    pub rival_pick_slot: Option<u8>,
+    pub show_first_run: bool,
+    pub hidden_window_mode: Option<window::Mode>,
 }
 
 #[derive(Debug, Clone)]
@@ -218,14 +227,29 @@ pub enum Message {
     ChampionshipFetched(Result<ChampionshipData, String>),
     WeekendFetched(Result<WeekendDetailData, String>),
     ChampionshipTabSelected(ChampionshipTab),
+    ChampionshipChartModeSelected(ChartMode),
     ChampionshipChartHover(Option<ChartHoverHit>),
     Tick,
     WindowResized(Size),
     WindowReady(window::Id),
+    WindowCloseRequested(window::Id),
+    HideToBackground(window::Mode),
     WindowAction(WindowAction),
+    TitleBarPressed,
+    TitleBarDrag,
+    TitleBarControlsHover(bool),
+    ThemeSelected(crate::ui::theme::ThemePresetId),
+    ActivateRivalCompare,
+    ExitRivalCompare,
+    RivalDriverSelected {
+        slot: u8,
+        driver_number: i64,
+    },
+    CompleteFirstRun,
     Navigate(Screen),
     OpenAbout,
     OpenDriverPicker,
+    OpenRivalPicker(u8),
     CloseOverlay,
     OverlayClick,
     ClearCache,
@@ -249,7 +273,20 @@ pub enum Message {
     DriverPickerSortField(DriverSortField),
     DriverPickerToggleGroup,
     ScrollInteraction,
+    DriverPickerScroll(RelativeOffset),
     CopyDebugLog,
+    SettingsToggled(SettingsToggle),
+    ShowFromTray,
+    QuitFromTray,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SettingsToggle {
+    IncludeTesting,
+    BackgroundOnClose,
+    NotificationsEnabled,
+    NotifyStandings,
+    NotifySessions,
 }
 
 impl AppState {
@@ -291,12 +328,57 @@ impl AppState {
             .unwrap_or(QualiGridVisibility::Hidden)
     }
 
+    pub fn sprint_visibility(&self) -> QualiGridVisibility {
+        self.weekend_data()
+            .map(|data| data.sprint_visibility)
+            .unwrap_or(QualiGridVisibility::Hidden)
+    }
+
+    pub fn rival_drivers(&self) -> (i64, i64) {
+        (
+            self.settings.rival_driver_first,
+            self.settings.rival_driver_second,
+        )
+    }
+
+    pub fn rival_ready(&self) -> bool {
+        let (first, second) = self.rival_drivers();
+        first > 0 && second > 0 && first != second
+    }
+
+    pub fn rival_compare_active(&self) -> bool {
+        self.settings.rival_compare_active && self.rival_ready()
+    }
+
     pub fn is_stale(&self) -> bool {
-        match &self.load {
-            LoadState::Ready(loaded) => loaded.stale,
-            LoadState::Error { cached: Some(loaded), .. } => loaded.stale,
-            _ => false,
-        }
+        self.is_any_stale()
+    }
+
+    pub fn is_any_stale(&self) -> bool {
+        calendar_stale(self)
+            || drivers_stale(self)
+            || championship_stale(self)
+            || weekend_stale(self)
+    }
+
+    pub fn last_fetched_at(&self) -> Option<DateTime<Utc>> {
+        [
+            calendar_fetched_at(self),
+            drivers_fetched_at(self),
+            championship_fetched_at(self),
+            weekend_fetched_at(self),
+        ]
+        .into_iter()
+        .flatten()
+        .max()
+    }
+
+    pub fn season_phase(&self) -> Option<SeasonPhase> {
+        let data = self.calendar()?;
+        Some(crate::domain::season_phase(
+            &data.triplet,
+            &data.countdown,
+        ))
     }
 
     pub fn flag_handle(&self, url: &str) -> Option<image::Handle> {
@@ -320,6 +402,70 @@ impl AppState {
     }
 }
 
+fn calendar_stale(state: &AppState) -> bool {
+    match &state.load {
+        LoadState::Ready(loaded) => loaded.stale,
+        LoadState::Error { cached: Some(loaded), .. } => loaded.stale,
+        _ => false,
+    }
+}
+
+fn drivers_stale(state: &AppState) -> bool {
+    match &state.drivers {
+        DriversLoadState::Ready(loaded) => loaded.stale,
+        DriversLoadState::Error { cached: Some(loaded), .. } => loaded.stale,
+        _ => false,
+    }
+}
+
+fn championship_stale(state: &AppState) -> bool {
+    match &state.championship {
+        ChampionshipLoadState::Ready(loaded) => loaded.stale,
+        ChampionshipLoadState::Error { cached: Some(loaded), .. } => loaded.stale,
+        _ => false,
+    }
+}
+
+fn weekend_stale(state: &AppState) -> bool {
+    match &state.weekend {
+        WeekendLoadState::Ready(loaded) => loaded.stale,
+        WeekendLoadState::Error { cached: Some(loaded), .. } => loaded.stale,
+        _ => false,
+    }
+}
+
+fn calendar_fetched_at(state: &AppState) -> Option<DateTime<Utc>> {
+    match &state.load {
+        LoadState::Ready(loaded) => Some(loaded.data.fetched_at),
+        LoadState::Error { cached: Some(loaded), .. } => Some(loaded.data.fetched_at),
+        _ => None,
+    }
+}
+
+fn drivers_fetched_at(state: &AppState) -> Option<DateTime<Utc>> {
+    match &state.drivers {
+        DriversLoadState::Ready(loaded) => Some(loaded.data.fetched_at),
+        DriversLoadState::Error { cached: Some(loaded), .. } => Some(loaded.data.fetched_at),
+        _ => None,
+    }
+}
+
+fn championship_fetched_at(state: &AppState) -> Option<DateTime<Utc>> {
+    match &state.championship {
+        ChampionshipLoadState::Ready(loaded) => Some(loaded.data.fetched_at),
+        ChampionshipLoadState::Error { cached: Some(loaded), .. } => Some(loaded.data.fetched_at),
+        _ => None,
+    }
+}
+
+fn weekend_fetched_at(state: &AppState) -> Option<DateTime<Utc>> {
+    match &state.weekend {
+        WeekendLoadState::Ready(loaded) => Some(loaded.data.fetched_at),
+        WeekendLoadState::Error { cached: Some(loaded), .. } => Some(loaded.data.fetched_at),
+        _ => None,
+    }
+}
+
 impl Default for AppState {
     fn default() -> Self {
         Self {
@@ -331,6 +477,7 @@ impl Default for AppState {
             championship: ChampionshipLoadState::Loading,
             weekend: WeekendLoadState::Loading,
             championship_tab: ChampionshipTab::default(),
+            championship_chart_mode: ChartMode::default(),
             settings: Settings::default(),
             pinned_drivers: Vec::new(),
             refreshing: false,
@@ -345,9 +492,14 @@ impl Default for AppState {
             asset_fetch_failed: HashSet::new(),
             viewport: Size::new(1100.0, 780.0),
             driver_picker: DriverPickerFilters::default(),
+            driver_picker_scroll: RelativeOffset::START,
             scrollbar_visible: ScrollbarVisibility::default(),
             boot: BootState::new(),
             chart_tooltip: None,
+            title_bar_controls_hover: false,
+            rival_pick_slot: None,
+            show_first_run: false,
+            hidden_window_mode: None,
         }
     }
 }

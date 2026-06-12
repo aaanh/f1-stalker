@@ -3,7 +3,7 @@ use iced::widget::{self, svg::Handle};
 use iced::{Color, Element, Length};
 
 use crate::state::Message;
-use crate::ui::theme::{MUTED, TEXT};
+use crate::ui::theme::{muted, text_color};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Icon {
@@ -30,6 +30,7 @@ pub enum Icon {
     Trash,
     Database,
     FileText,
+    Maximize,
 }
 
 impl Icon {
@@ -58,6 +59,7 @@ impl Icon {
             Icon::Trash => include_bytes!("../assets/icons/trash.svg"),
             Icon::Database => include_bytes!("../assets/icons/database.svg"),
             Icon::FileText => include_bytes!("../assets/icons/file-text.svg"),
+            Icon::Maximize => include_bytes!("../assets/icons/maximize-2.svg"),
         }
     }
 
@@ -100,7 +102,7 @@ pub fn section_heading(
     subtitle: Option<Element<'static, Message>>,
 ) -> Element<'static, Message> {
     let mut heading = column![
-        icon_label(icon_kind, 16.0, TEXT, title, 15, TEXT),
+        icon_label(icon_kind, 16.0, text_color(), title, 15, text_color()),
     ]
     .spacing(2);
 
@@ -118,5 +120,5 @@ pub fn section_heading(
 }
 
 pub fn subtitle_text(content: impl Into<String>) -> Element<'static, Message> {
-    text(content.into()).size(11).color(MUTED).into()
+    text(content.into()).size(11).color(muted()).into()
 }

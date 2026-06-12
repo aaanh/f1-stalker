@@ -1,10 +1,10 @@
 use std::collections::{HashMap, HashSet};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use chrono::{Datelike, Utc};
 use iced::time;
 use iced::widget::image;
-use iced::window;
+use iced::window::{self, Mode};
 use iced::{clipboard, Element, Size, Subscription, Task};
 
 use openf1::Session;
@@ -19,18 +19,23 @@ use crate::data::{
     WeekendFetchInput,
 };
 use crate::assets::{
-    apply_platform_branding, fonts, window_icon, APP_DISPLAY_NAME,
+    apply_platform_branding, drain_menu_messages, fonts, window_icon, APP_DISPLAY_NAME,
 };
 use crate::db::{default_db_path, rebuild_database, AssetStore, Database};
 use crate::debug;
+use crate::domain::calendar_filter::next_session_reminder_at;
 use crate::domain::{
     circuit_image_url, is_circuit_image_url, move_pin, pin_driver, prepare_circuit_image,
-    unpin_all, unpin_driver,
+    standings_signature, unpin_all, unpin_driver,
 };
+use crate::platform::notifications::{notify_session_reminder, notify_standings_change};
+use crate::platform::{install_tray, poll_tray_actions, TrayAction};
+use crate::ui::theme::{self, ThemePresetId};
+use crate::ui::restore_driver_picker_scroll;
 use crate::state::{
     animate_chart_tooltip, apply_chart_hover, AppState, BootStepId, ChampionshipLoadState,
     DriversLoadState, LoadState, LoadedCalendar, LoadedChampionship, LoadedDrivers, LoadedWeekend,
-    Message, Overlay, WeekendLoadState, WindowAction,
+    Message, Overlay, SettingsToggle, WeekendLoadState, WindowAction,
 };
 use crate::ui::shell;
 
@@ -38,7 +43,7 @@ const TICK_MS: u64 = 50;
 
 pub fn run() -> iced::Result {
     let mut app = iced::application(App::title, App::update, App::view)
-        .theme(|_| crate::ui::theme::theme())
+        .theme(|_| crate::ui::theme::iced_theme())
         .subscription(App::subscription)
         .default_font(fonts::UI);
 
@@ -51,6 +56,7 @@ pub fn run() -> iced::Result {
             min_size: Some(Size::new(800.0, 600.0)),
             decorations: false,
             icon: Some(window_icon()),
+            exit_on_close_request: false,
             ..Default::default()
         })
         .run_with(App::boot)
@@ -60,9 +66,16 @@ struct App {
     state: AppState,
     db: Database,
     assets: AssetStore,
+    title_bar_last_press: Option<Instant>,
+    title_bar_drag_pending: bool,
+    _tray: Option<tray_icon::TrayIcon>,
 }
 
 impl App {
+    fn title(_state: &App) -> String {
+        APP_DISPLAY_NAME.into()
+    }
+
     fn boot() -> (Self, Task<Message>) {
         apply_platform_branding();
         debug::info(format!("{APP_DISPLAY_NAME} starting"));
@@ -80,6 +93,16 @@ impl App {
             pinned_drivers,
             ..AppState::default()
         };
+        theme::init_palette(state.settings.theme_id);
+        state.show_first_run = !state.settings.first_run_complete;
+
+        let tray = match install_tray() {
+            Ok(icon) => Some(icon),
+            Err(error) => {
+                debug::warn(format!("System tray unavailable: {error}"));
+                None
+            }
+        };
 
         let mut tasks = vec![window::get_oldest().then(|id| match id {
             Some(window_id) => Task::batch([
@@ -89,7 +112,8 @@ impl App {
             None => Task::none(),
         })];
 
-        if let Ok(Some(data)) = db.calendar_from_cache(season) {
+        if let Ok(Some(mut data)) = db.calendar_from_cache(season) {
+            data.apply_preferences(state.settings.include_testing);
             debug::info("Showing cached calendar on boot");
             let fresh = db
                 .cache_entry_for_calendar(season)
@@ -159,11 +183,96 @@ impl App {
         finalize_boot_media_step(&mut state);
         state.boot.try_finish();
 
-        (Self { state, db, assets }, Task::batch(tasks))
+        (Self {
+            state,
+            db,
+            assets,
+            title_bar_last_press: None,
+            title_bar_drag_pending: false,
+            _tray: tray,
+        }, Task::batch(tasks))
     }
 
-    fn title(&self) -> String {
-        APP_DISPLAY_NAME.into()
+    fn maybe_notify_standings(&self, data: &ChampionshipData) {
+        if !self.state.settings.notifications_enabled || !self.state.settings.notify_standings {
+            return;
+        }
+
+        let Some(latest) = data.rounds.last() else {
+            return;
+        };
+
+        let signature = standings_signature(&latest.drivers);
+        let key = crate::db::schema::SETTING_LAST_STANDINGS_SIGNATURE;
+        if self
+            .db
+            .load_setting(key)
+            .ok()
+            .flatten()
+            .as_deref()
+            == Some(signature.as_str())
+        {
+            return;
+        }
+
+        let _ = self.db.save_setting(key, &signature);
+        let roster = self.state.drivers_roster().unwrap_or(&[]);
+        for pin in &self.state.pinned_drivers {
+            if let Some(entry) = latest
+                .drivers
+                .iter()
+                .find(|row| row.driver_number == pin.driver_number)
+            {
+                if let Some(driver) = roster.iter().find(|d| d.driver_number == pin.driver_number)
+                {
+                    notify_standings_change(
+                        &crate::domain::driver_display_name(driver),
+                        entry.position,
+                        entry.points,
+                    );
+                }
+            }
+        }
+    }
+
+    fn maybe_notify_upcoming_session(&self) {
+        if !self.state.settings.notifications_enabled || !self.state.settings.notify_sessions {
+            return;
+        }
+
+        let Some(calendar) = self.state.calendar() else {
+            return;
+        };
+
+        let now = Utc::now();
+        let lead = self.state.settings.session_reminder_minutes;
+        let Some((remind_at, session_name)) = next_session_reminder_at(
+            &calendar.sessions,
+            now,
+            lead,
+        ) else {
+            return;
+        };
+
+        if now < remind_at {
+            return;
+        }
+
+        let key = crate::db::schema::SETTING_LAST_SESSION_REMINDER;
+        let signature = format!("{session_name}:{lead}");
+        if self
+            .db
+            .load_setting(key)
+            .ok()
+            .flatten()
+            .as_deref()
+            == Some(signature.as_str())
+        {
+            return;
+        }
+
+        let _ = self.db.save_setting(key, &signature);
+        notify_session_reminder(&session_name, &format!("{lead} minutes"));
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
@@ -201,7 +310,7 @@ impl App {
             Message::Fetched(result) => {
                 self.state.refreshing = false;
                 match result {
-                    Ok(data) => {
+                    Ok(mut data) => {
                         debug::info(format!(
                             "Calendar fetched for season {} ({} meetings)",
                             data.season,
@@ -211,6 +320,7 @@ impl App {
                         let _ = self.db.save_settings(&self.state.settings);
                         let blob = CalendarCacheBlob::from_calendar(&data);
                         let _ = self.db.save_calendar_cache(&blob);
+                        data.apply_preferences(self.state.settings.include_testing);
                         self.state.load = LoadState::Ready(LoadedCalendar {
                             data,
                             stale: false,
@@ -247,7 +357,8 @@ impl App {
                                 data: loaded.data.clone(),
                                 stale: true,
                             });
-                        } else if let Ok(Some(data)) = self.db.calendar_from_cache(season) {
+                        } else if let Ok(Some(mut data)) = self.db.calendar_from_cache(season) {
+                            data.apply_preferences(self.state.settings.include_testing);
                             self.state.load = LoadState::Ready(LoadedCalendar { data, stale: true });
                         } else {
                             self.state.load = LoadState::Error {
@@ -352,6 +463,7 @@ impl App {
                         ));
                         let blob = ChampionshipCacheBlob::from_data(&data);
                         let _ = self.db.save_championship_cache(&blob);
+                        self.maybe_notify_standings(&data);
                         self.state.championship = ChampionshipLoadState::Ready(LoadedChampionship {
                             data,
                             stale: false,
@@ -388,6 +500,11 @@ impl App {
             }
             Message::ChampionshipTabSelected(tab) => {
                 self.state.championship_tab = tab;
+                self.state.chart_tooltip = None;
+                Task::none()
+            }
+            Message::ChampionshipChartModeSelected(mode) => {
+                self.state.championship_chart_mode = mode;
                 self.state.chart_tooltip = None;
                 Task::none()
             }
@@ -453,6 +570,116 @@ impl App {
                         Utc::now(),
                     );
                 }
+
+                self.maybe_notify_upcoming_session();
+
+                let mut follow_up = Vec::new();
+                for action in poll_tray_actions() {
+                    follow_up.push(match action {
+                        TrayAction::Show => Message::ShowFromTray,
+                        TrayAction::Quit => Message::QuitFromTray,
+                    });
+                }
+                follow_up.extend(drain_menu_messages());
+
+                if follow_up.is_empty() {
+                    Task::none()
+                } else {
+                    Task::batch(follow_up.into_iter().map(|message| self.update(message)))
+                }
+            }
+            Message::ShowFromTray => {
+                if let Some(id) = self.state.window_id {
+                    let mode = self
+                        .state
+                        .hidden_window_mode
+                        .take()
+                        .unwrap_or(Mode::Windowed);
+                    return Task::batch([
+                        window::change_mode(id, mode),
+                        window::gain_focus(id),
+                    ]);
+                }
+                Task::none()
+            }
+            Message::QuitFromTray => {
+                iced::exit()
+            }
+            Message::TitleBarPressed => {
+                let now = Instant::now();
+                let is_double = self
+                    .title_bar_last_press
+                    .is_some_and(|last| now.duration_since(last) <= Duration::from_millis(400));
+                self.title_bar_last_press = Some(now);
+
+                if is_double {
+                    self.title_bar_drag_pending = false;
+                    return window_action_task(self.state.window_id, WindowAction::Maximize);
+                }
+
+                self.title_bar_drag_pending = true;
+                Task::perform(
+                    async {
+                        tokio::time::sleep(Duration::from_millis(220)).await;
+                    },
+                    |_| Message::TitleBarDrag,
+                )
+            }
+            Message::TitleBarDrag => {
+                if self.title_bar_drag_pending {
+                    self.title_bar_drag_pending = false;
+                    return window_action_task(self.state.window_id, WindowAction::Drag);
+                }
+                Task::none()
+            }
+            Message::TitleBarControlsHover(hover) => {
+                self.state.title_bar_controls_hover = hover;
+                Task::none()
+            }
+            Message::ThemeSelected(theme_id) => {
+                self.state.settings.theme_id = theme_id;
+                theme::init_palette(theme_id);
+                let _ = self.db.save_settings(&self.state.settings);
+                Task::none()
+            }
+            Message::ActivateRivalCompare => {
+                if self.state.rival_ready() {
+                    self.state.settings.rival_compare_active = true;
+                    let _ = self.db.save_settings(&self.state.settings);
+                }
+                Task::none()
+            }
+            Message::ExitRivalCompare => {
+                self.state.settings.rival_compare_active = false;
+                let _ = self.db.save_settings(&self.state.settings);
+                Task::none()
+            }
+            Message::OpenRivalPicker(slot) => {
+                self.state.rival_pick_slot = Some(slot);
+                self.state.overlay = Overlay::DriverPicker;
+                restore_driver_picker_scroll(self.state.driver_picker_scroll)
+            }
+            Message::RivalDriverSelected { slot, driver_number } => {
+                match slot {
+                    0 => self.state.settings.rival_driver_first = driver_number,
+                    _ => self.state.settings.rival_driver_second = driver_number,
+                }
+                if self.state.settings.rival_driver_first == self.state.settings.rival_driver_second
+                    && self.state.settings.rival_driver_first > 0
+                {
+                    self.state.settings.rival_compare_active = false;
+                } else if !self.state.rival_ready() {
+                    self.state.settings.rival_compare_active = false;
+                }
+                let _ = self.db.save_settings(&self.state.settings);
+                self.state.rival_pick_slot = None;
+                self.state.overlay = Overlay::None;
+                Task::none()
+            }
+            Message::CompleteFirstRun => {
+                self.state.settings.first_run_complete = true;
+                self.state.show_first_run = false;
+                let _ = self.db.save_settings(&self.state.settings);
                 Task::none()
             }
             Message::WindowResized(size) => {
@@ -464,7 +691,31 @@ impl App {
                 self.state.window_id = Some(id);
                 Task::none()
             }
-            Message::WindowAction(action) => window_action_task(self.state.window_id, action),
+            Message::WindowCloseRequested(id) => {
+                self.state.window_id = Some(id);
+                hide_or_close_window(&self.state)
+            }
+            Message::HideToBackground(current_mode) => {
+                let restore = match current_mode {
+                    Mode::Hidden => self
+                        .state
+                        .hidden_window_mode
+                        .unwrap_or(Mode::Windowed),
+                    mode => mode,
+                };
+                self.state.hidden_window_mode = Some(restore);
+                if let Some(id) = self.state.window_id {
+                    window::change_mode(id, Mode::Hidden)
+                } else {
+                    Task::none()
+                }
+            }
+            Message::WindowAction(action) => {
+                if matches!(action, WindowAction::Close) {
+                    return hide_or_close_window(&self.state);
+                }
+                window_action_task(self.state.window_id, action)
+            }
             Message::Navigate(screen) => {
                 self.state.screen = screen;
                 self.state.settings_notice = None;
@@ -472,6 +723,50 @@ impl App {
             }
             Message::ScrollInteraction => {
                 self.state.scrollbar_visible.on_scroll(TICK_MS);
+                Task::none()
+            }
+            Message::DriverPickerScroll(offset) => {
+                self.state.driver_picker_scroll = offset;
+                self.state.scrollbar_visible.on_scroll(TICK_MS);
+                Task::none()
+            }
+            Message::SettingsToggled(toggle) => {
+                match toggle {
+                    SettingsToggle::IncludeTesting => {
+                        self.state.settings.include_testing =
+                            !self.state.settings.include_testing;
+                        if let Some(season) = self.state.calendar().map(|calendar| calendar.season) {
+                            if let Ok(Some(mut data)) = self.db.calendar_from_cache(season) {
+                                data.apply_preferences(self.state.settings.include_testing);
+                                match &mut self.state.load {
+                                    LoadState::Ready(loaded) => loaded.data = data,
+                                    LoadState::Error {
+                                        cached: Some(loaded),
+                                        ..
+                                    } => loaded.data = data,
+                                    _ => {}
+                                }
+                            }
+                        }
+                    }
+                    SettingsToggle::BackgroundOnClose => {
+                        self.state.settings.background_on_close =
+                            !self.state.settings.background_on_close;
+                    }
+                    SettingsToggle::NotificationsEnabled => {
+                        self.state.settings.notifications_enabled =
+                            !self.state.settings.notifications_enabled;
+                    }
+                    SettingsToggle::NotifyStandings => {
+                        self.state.settings.notify_standings =
+                            !self.state.settings.notify_standings;
+                    }
+                    SettingsToggle::NotifySessions => {
+                        self.state.settings.notify_sessions =
+                            !self.state.settings.notify_sessions;
+                    }
+                }
+                let _ = self.db.save_settings(&self.state.settings);
                 Task::none()
             }
             Message::CopyDebugLog => {
@@ -487,16 +782,23 @@ impl App {
                 Task::none()
             }
             Message::OpenDriverPicker => {
+                self.state.rival_pick_slot = None;
                 self.state.driver_picker = crate::domain::DriverPickerFilters::default();
+                self.state.driver_picker_scroll = iced::widget::scrollable::RelativeOffset::START;
                 self.state.overlay = Overlay::DriverPicker;
-                Task::batch(fetch_driver_media_tasks(
+                let mut tasks = vec![restore_driver_picker_scroll(
+                    iced::widget::scrollable::RelativeOffset::START,
+                )];
+                tasks.extend(fetch_driver_media_tasks(
                     &self.state,
                     &self.assets,
                     &self.db,
-                ))
+                ));
+                Task::batch(tasks)
             }
             Message::CloseOverlay => {
                 self.state.overlay = Overlay::None;
+                self.state.rival_pick_slot = None;
                 self.state.driver_picker = crate::domain::DriverPickerFilters::default();
                 Task::none()
             }
@@ -652,7 +954,19 @@ impl App {
         Subscription::batch([
             time::every(Duration::from_millis(TICK_MS)).map(|_| Message::Tick),
             window::resize_events().map(|(_id, size)| Message::WindowResized(size)),
+            window::close_requests().map(Message::WindowCloseRequested),
         ])
+    }
+}
+
+fn hide_or_close_window(state: &AppState) -> Task<Message> {
+    if state.settings.background_on_close {
+        let Some(id) = state.window_id else {
+            return Task::none();
+        };
+        window::get_mode(id).then(|mode| Task::done(Message::HideToBackground(mode)))
+    } else {
+        window_action_task(state.window_id, WindowAction::Close)
     }
 }
 
@@ -668,6 +982,14 @@ fn window_action_task(window_id: Option<window::Id>, action: WindowAction) -> Ta
         WindowAction::Close => window::close(id),
         WindowAction::Minimize => window::minimize(id, true),
         WindowAction::Maximize => window::toggle_maximize(id),
+        WindowAction::Fullscreen => window::get_mode(id).then(move |mode| {
+            let next = if mode == Mode::Fullscreen {
+                Mode::Windowed
+            } else {
+                Mode::Fullscreen
+            };
+            window::change_mode(id, next)
+        }),
         WindowAction::Drag => window::drag(id),
     }
 }
@@ -1233,6 +1555,7 @@ fn schedule_weekend_refresh(
         &calendar.sessions,
         &pinned_numbers,
         cached_grid.clone(),
+        None,
         &cached_track,
         &cached_forecasts,
     ) {
@@ -1287,6 +1610,7 @@ fn fetch_weekend_task(
                 sessions,
                 pinned_numbers,
                 cached_grid,
+                cached_sprint_grid: None,
                 cached_track,
                 cached_forecasts,
             })
@@ -1342,6 +1666,7 @@ fn load_weekend_from_db(db: &Database, state: &AppState) -> Option<WeekendDetail
         &calendar.sessions,
         &pinned_numbers,
         Some(cached_grid),
+        None,
         &cached_track,
         &cached_forecasts,
     )

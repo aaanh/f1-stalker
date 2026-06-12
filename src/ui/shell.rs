@@ -5,9 +5,10 @@ use crate::state::{AppState, Message};
 use crate::ui::boot_screen::boot_screen;
 use crate::ui::dashboard::dashboard;
 use crate::ui::driver_picker::overlay_stack;
+use crate::ui::first_run::{first_run_overlay, should_show_first_run};
 use crate::ui::layout::LayoutConfig;
 use crate::ui::settings::settings_page;
-use crate::ui::theme::BG;
+use crate::ui::theme::bg;
 use crate::ui::title_bar::title_bar;
 
 pub fn shell(state: &AppState) -> Element<'_, Message> {
@@ -20,7 +21,7 @@ pub fn shell(state: &AppState) -> Element<'_, Message> {
         .width(Length::Fill)
         .height(Length::Fill)
         .style(|_| container::Style {
-            background: Some(BG.into()),
+            background: Some(bg().into()),
             ..Default::default()
         })
         .into();
@@ -41,9 +42,14 @@ pub fn shell(state: &AppState) -> Element<'_, Message> {
     .width(Length::Fill)
     .height(Length::Fill)
     .style(|_| container::Style {
-        background: Some(BG.into()),
+        background: Some(bg().into()),
         ..Default::default()
     });
 
-    overlay_stack(main.into(), state.overlay, state)
+    let stacked = overlay_stack(main.into(), state.overlay, state);
+    if should_show_first_run(state) {
+        iced::widget::stack![stacked, first_run_overlay(state)].into()
+    } else {
+        stacked
+    }
 }

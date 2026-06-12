@@ -5,7 +5,7 @@ use crate::assets::boot_brand;
 use crate::state::bootstrap::{BootState, BootStepStatus};
 use crate::state::{AppState, Message};
 use crate::ui::icons::{icon, Icon};
-use crate::ui::theme::{ACCENT, BORDER, LIVE, MUTED, SURFACE, TEXT};
+use crate::ui::theme::{accent, border, live, muted, surface, text_color};
 
 pub fn boot_screen(state: &AppState) -> Element<'_, Message> {
     let boot = &state.boot;
@@ -14,7 +14,7 @@ pub fn boot_screen(state: &AppState) -> Element<'_, Message> {
         column![
             boot_brand(),
             Space::with_height(8),
-            text("Preparing your season dashboard").size(14).color(MUTED),
+            text("Preparing your season dashboard").size(14).color(muted()),
             Space::with_height(28),
             boot_card(boot),
         ]
@@ -33,13 +33,13 @@ fn boot_card(boot: &BootState) -> Element<'static, Message> {
 
     container(
         column![
-            text(boot.current_label()).size(13).color(TEXT),
+            text(boot.current_label()).size(13).color(text_color()),
             Space::with_height(12),
             progress_bar(0.0..=1.0, progress),
             Space::with_height(6),
             text(format!("{:.0}%", progress * 100.0))
                 .size(11)
-                .color(MUTED),
+                .color(muted()),
             Space::with_height(20),
             column(boot.steps.iter().map(step_row).collect::<Vec<_>>()).spacing(8),
         ]
@@ -48,9 +48,9 @@ fn boot_card(boot: &BootState) -> Element<'static, Message> {
     .padding(24)
     .width(Length::Fixed(460.0))
     .style(|_| container::Style {
-        background: Some(SURFACE.into()),
+        background: Some(surface().into()),
         border: iced::Border {
-            color: BORDER,
+            color: border(),
             width: 1.0,
             radius: 12.0.into(),
         },
@@ -61,11 +61,11 @@ fn boot_card(boot: &BootState) -> Element<'static, Message> {
 
 fn step_row(step: &crate::state::bootstrap::BootStep) -> Element<'static, Message> {
     let (marker, marker_color, label_color) = match step.status {
-        BootStepStatus::Done => (Icon::Check, LIVE, TEXT),
-        BootStepStatus::Skipped => (Icon::Minus, MUTED, MUTED),
-        BootStepStatus::Failed => (Icon::Alert, ACCENT, TEXT),
-        BootStepStatus::Running => (Icon::Loader, ACCENT, TEXT),
-        BootStepStatus::Pending => (Icon::Circle, MUTED, MUTED),
+        BootStepStatus::Done => (Icon::Check, live(), text_color()),
+        BootStepStatus::Skipped => (Icon::Minus, muted(), muted()),
+        BootStepStatus::Failed => (Icon::Alert, accent(), text_color()),
+        BootStepStatus::Running => (Icon::Loader, accent(), text_color()),
+        BootStepStatus::Pending => (Icon::Circle, muted(), muted()),
     };
 
     let detail = if step.detail.is_empty() {

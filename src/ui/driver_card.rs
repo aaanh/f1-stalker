@@ -8,7 +8,7 @@ use crate::state::{AppState, Message};
 use crate::ui::components::icon_button_group_sized;
 use crate::ui::icons::{icon, icon_label, Icon};
 use crate::ui::layout::LayoutConfig;
-use crate::ui::theme::{ACCENT, BORDER, MUTED, SURFACE, TEXT};
+use crate::ui::theme::{accent, border, muted, surface, text_color};
 
 const HEADSHOT_SIZE: f32 = 112.0;
 const FLAG_BADGE_WIDTH: f32 = 30.0;
@@ -30,6 +30,10 @@ const REORDER_ICON_SIZE: f32 = 22.0;
 
 pub fn driver_portrait(state: &AppState, driver: &Driver) -> Element<'static, Message> {
     driver_portrait_sized(state, driver, HEADSHOT_SIZE)
+}
+
+pub fn rival_driver_portrait(state: &AppState, driver: &Driver) -> Element<'static, Message> {
+    driver_portrait_sized(state, driver, 128.0)
 }
 
 fn driver_portrait_sized(
@@ -63,7 +67,7 @@ fn driver_portrait_sized(
         .padding(BORDER_WIDTH as u16)
         .clip(true)
         .style(move |_| container::Style {
-            background: Some(SURFACE.into()),
+            background: Some(surface().into()),
             border: iced::Border {
                 color: colour,
                 width: BORDER_WIDTH,
@@ -199,7 +203,7 @@ fn driver_identity_column(
         row![
             driver_nationality_flag(state, driver),
             Space::with_width(8),
-            text(full_name).size(name_size).color(TEXT),
+            text(full_name).size(name_size).color(text_color()),
         ]
         .spacing(0)
         .align_y(iced::Alignment::Center),
@@ -210,7 +214,7 @@ fn driver_identity_column(
         identity = identity.push(
             text(acronym.to_uppercase())
                 .size(DRIVER_ACRONYM_SIZE)
-                .color(MUTED),
+                .color(muted()),
         );
     }
 
@@ -218,7 +222,7 @@ fn driver_identity_column(
         row![
             team_logo(state, driver),
             Space::with_width(8),
-            text(team_name).size(11).color(MUTED),
+            text(team_name).size(11).color(muted()),
         ]
         .spacing(0)
         .align_y(iced::Alignment::Center),
@@ -236,19 +240,54 @@ fn driver_identity_column(
 }
 
 pub fn driver_picker_row(state: &AppState, driver: Driver) -> Element<'static, Message> {
+    let driver_number = driver.driver_number;
+
+    if let Some(slot) = state.rival_pick_slot {
+        let row_content = row![
+            driver_portrait(state, &driver),
+            Space::with_width(12),
+            driver_identity_column(state, &driver, 18, false),
+            Space::with_width(Length::Fill),
+            text("Select").size(12).color(accent()),
+        ]
+        .align_y(iced::Alignment::Center)
+        .width(Length::Fill);
+
+        return button(
+            container(row_content)
+                .padding(ROW_PADDING)
+                .width(Length::Fill)
+                .style(|_| container::Style {
+                    background: Some(surface().into()),
+                    border: iced::Border {
+                        color: border(),
+                        width: 1.0,
+                        radius: 8.0.into(),
+                    },
+                    ..Default::default()
+                }),
+        )
+        .width(Length::Fill)
+        .padding(0)
+        .on_press(Message::RivalDriverSelected {
+            slot,
+            driver_number,
+        })
+        .style(|_, status| pin_row_style(status))
+        .into();
+    }
+
     let pinned = state
         .pinned_drivers
         .iter()
         .any(|pin| pin.driver_number == driver.driver_number);
 
-    let driver_number = driver.driver_number;
-
     let action: Element<'static, Message> = if pinned {
         row_action_button("Unpin", Message::UnpinDriver(driver_number))
     } else if state.can_add_pin() {
-        icon_label(Icon::Pin, 13.0, ACCENT, "Pin", 12, ACCENT).into()
+        icon_label(Icon::Pin, 13.0, accent(), "Pin", 12, accent()).into()
     } else {
-        text("Full").size(11).color(MUTED).into()
+        text("Full").size(11).color(muted()).into()
     };
 
     let row_content = row![
@@ -268,9 +307,9 @@ pub fn driver_picker_row(state: &AppState, driver: Driver) -> Element<'static, M
         .width(Length::Fill)
         .height(Length::Shrink)
         .style(|_| container::Style {
-            background: Some(SURFACE.into()),
+            background: Some(surface().into()),
             border: iced::Border {
-                color: BORDER,
+                color: border(),
                 width: 1.0,
                 radius: 8.0.into(),
             },
@@ -292,8 +331,8 @@ pub fn driver_picker_row(state: &AppState, driver: Driver) -> Element<'static, M
 fn row_action_button(label: &'static str, message: Message) -> Element<'static, Message> {
     button(
         row![
-            icon(Icon::PinOff, 14.0, ACCENT),
-            text(label).size(13).color(ACCENT),
+            icon(Icon::PinOff, 14.0, accent()),
+            text(label).size(13).color(accent()),
         ]
         .spacing(6)
         .align_y(iced::Alignment::Center),
@@ -304,16 +343,16 @@ fn row_action_button(label: &'static str, message: Message) -> Element<'static, 
             let bg = if status == button::Status::Hovered {
                 iced::Background::Color(iced::Color {
                     a: 0.18,
-                    ..ACCENT
+                    ..accent()
                 })
             } else {
                 iced::Background::Color(iced::Color::TRANSPARENT)
             };
             button::Style {
                 background: Some(bg),
-                text_color: ACCENT,
+                text_color: accent(),
                 border: iced::Border {
-                    color: ACCENT,
+                    color: accent(),
                     width: 1.0,
                     radius: 6.0.into(),
                 },
@@ -327,14 +366,14 @@ fn pin_row_style(status: button::Status) -> button::Style {
     let bg = if status == button::Status::Hovered {
         iced::Background::Color(iced::Color {
             a: 0.35,
-            ..SURFACE
+            ..surface()
         })
     } else {
         iced::Background::Color(iced::Color::TRANSPARENT)
     };
     button::Style {
         background: Some(bg),
-        text_color: TEXT,
+        text_color: text_color(),
         border: iced::Border {
             radius: 8.0.into(),
             width: 0.0,
@@ -419,9 +458,9 @@ pub fn pinned_driver_card(
         .width(Length::Fill)
         .height(Length::Shrink)
         .style(|_| container::Style {
-            background: Some(SURFACE.into()),
+            background: Some(surface().into()),
             border: iced::Border {
-                color: BORDER,
+                color: border(),
                 width: 1.0,
                 radius: 8.0.into(),
             },

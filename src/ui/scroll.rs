@@ -1,9 +1,13 @@
 use iced::widget::{container, scrollable};
-use iced::widget::scrollable::{Direction, Id, Scrollbar, Status, Style};
-use iced::{Color, Element, Length, Theme};
+use iced::widget::scrollable::{Direction, Id, RelativeOffset, Scrollbar, Status, Style};
+use iced::{Color, Element, Length, Task, Theme};
 
 use crate::state::Message;
-use crate::ui::theme::ACCENT;
+use crate::ui::theme::accent;
+
+pub fn driver_picker_scroll_id() -> Id {
+    Id::new("driver-picker-scroll")
+}
 
 fn vertical_scrollbar() -> Scrollbar {
     Scrollbar::new()
@@ -83,13 +87,13 @@ pub fn scrollbar_style(_theme: &Theme, status: Status, visible: bool) -> Style {
             if is_vertical_scrollbar_dragged {
                 vertical.scroller.color = Color {
                     a: 0.85,
-                    ..ACCENT
+                    ..accent()
                 };
             }
             if is_horizontal_scrollbar_dragged {
                 horizontal.scroller.color = Color {
                     a: 0.85,
-                    ..ACCENT
+                    ..accent()
                 };
             }
         }
@@ -122,6 +126,21 @@ pub fn horizontal_scroll<'a>(
         .direction(Direction::Horizontal(horizontal_scrollbar()))
         .style(move |theme, status| scrollbar_style(theme, status, visible))
         .on_scroll(|_| Message::ScrollInteraction)
+}
+
+pub fn driver_picker_scroll<'a>(
+    content: Element<'a, Message>,
+    visible: bool,
+) -> scrollable::Scrollable<'a, Message, Theme> {
+    scrollable(content)
+        .id(driver_picker_scroll_id())
+        .direction(Direction::Vertical(vertical_scrollbar()))
+        .style(move |theme, status| scrollbar_style(theme, status, visible))
+        .on_scroll(|viewport| Message::DriverPickerScroll(viewport.relative_offset()))
+}
+
+pub fn restore_driver_picker_scroll(offset: RelativeOffset) -> Task<Message> {
+    scrollable::snap_to(driver_picker_scroll_id(), offset)
 }
 
 pub fn scrollable_page<'a>(

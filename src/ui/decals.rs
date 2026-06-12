@@ -4,8 +4,8 @@ use iced::{Color, Element, Length};
 use crate::state::Message;
 use crate::ui::icons::{icon, Icon};
 use crate::ui::theme::{
-    CHECKER_DARK, CHECKER_LIGHT, FLAG_BLACK, FLAG_GREEN, FLAG_RED,
-    FLAG_YELLOW, SURFACE, TEXT,
+    CHECKER_DARK, CHECKER_LIGHT, FLAG_BLACK, FLAG_GREEN, FLAG_RED, FLAG_YELLOW, surface,
+    text_color,
 };
 
 const CELL: f32 = 8.0;
@@ -80,7 +80,7 @@ pub fn signal_flag_sized<'a>(
     )
     .padding([5, 10])
     .style(move |_| container::Style {
-        background: Some(SURFACE.into()),
+        background: Some(surface().into()),
         border: iced::Border {
             color,
             width: 1.0,
@@ -129,7 +129,7 @@ pub fn intermission_panel(
             Space::with_height(10),
             icon(pulse_icon, pulse_size, FLAG_YELLOW),
             text("INTERMISSION").size(title_size).color(FLAG_YELLOW),
-            text(subtitle).size(layout.card_detail_size).color(TEXT),
+            text(subtitle).size(layout.card_detail_size).color(text_color()),
             Space::with_height(8),
             centered_checkered(12, 2, slow),
         ]

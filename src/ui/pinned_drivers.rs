@@ -6,9 +6,9 @@ use crate::state::{AppState, DriversLoadState, Message};
 use crate::ui::components::secondary_button_icon;
 use crate::ui::icons::{section_heading, subtitle_text, Icon};
 use crate::ui::driver_card::pinned_driver_card;
-use crate::ui::quali_grid::quali_grid_section;
+use crate::ui::quali_grid::{quali_grid_section, sprint_grid_section};
 use crate::ui::layout::LayoutConfig;
-use crate::ui::theme::{BORDER, MUTED, SURFACE};
+use crate::ui::theme::{border, muted, surface};
 
 pub fn pinned_drivers_section(
     state: &AppState,
@@ -22,11 +22,11 @@ pub fn pinned_drivers_section(
     let add_control: Element<Message> = if state.can_add_pin() {
         secondary_button_icon(Some(Icon::UserPlus), "Add driver", Message::OpenDriverPicker)
     } else {
-        container(text("Pin limit reached").size(13).color(MUTED))
+        container(text("Pin limit reached").size(13).color(muted()))
             .padding([8, 14])
             .style(|_| container::Style {
                 border: iced::Border {
-                    color: BORDER,
+                    color: border(),
                     width: 1.0,
                     radius: 6.0.into(),
                 },
@@ -55,12 +55,18 @@ pub fn pinned_drivers_section(
     };
 
     let mut body = column![].spacing(12).width(Length::Fill);
+    if let Some(notice) = drivers_notice(state) {
+        body = body.push(notice);
+    }
     if state.pinned_drivers.is_empty() {
         body = body.push(empty_state());
     } else {
         body = body.push(pinned_grid(state, layout));
         if let Some(quali) = quali_grid_section(state, layout) {
             body = body.push(quali);
+        }
+        if let Some(sprint) = sprint_grid_section(state, layout) {
+            body = body.push(sprint);
         }
     }
 
@@ -74,9 +80,9 @@ pub fn pinned_drivers_section(
     .width(Length::Fill)
     .height(Length::Shrink)
     .style(|_| container::Style {
-        background: Some(SURFACE.into()),
+        background: Some(surface().into()),
         border: iced::Border {
-            color: BORDER,
+            color: border(),
             width: 1.0,
             radius: 8.0.into(),
         },
@@ -88,8 +94,29 @@ pub fn pinned_drivers_section(
 fn empty_state() -> Element<'static, Message> {
     text("Pin up to 6 drivers to follow their season progress.")
         .size(13)
-        .color(MUTED)
+        .color(muted())
         .into()
+}
+
+fn drivers_notice(state: &AppState) -> Option<Element<'_, Message>> {
+    match &state.drivers {
+        DriversLoadState::Error { message, cached: None } => Some(
+            column![
+                text("Could not load driver roster").size(13),
+                text(message).size(12).color(muted()),
+                secondary_button_icon(Some(Icon::Refresh), "Retry", Message::Refresh),
+            ]
+            .spacing(6)
+            .into(),
+        ),
+        DriversLoadState::Ready(loaded) if loaded.stale => Some(
+            text("Driver roster is cached · refresh to update.")
+                .size(12)
+                .color(muted())
+                .into(),
+        ),
+        _ => None,
+    }
 }
 
 fn pinned_grid(state: &AppState, layout: LayoutConfig) -> Element<'_, Message> {
@@ -100,7 +127,7 @@ fn pinned_grid(state: &AppState, layout: LayoutConfig) -> Element<'_, Message> {
         return column![
             text("Pinned drivers are saved, but roster data is unavailable.")
                 .size(12)
-                .color(MUTED),
+                .color(muted()),
             Space::with_height(8),
             secondary_button_icon(Some(Icon::Refresh), "Reload drivers", Message::Refresh),
         ]
@@ -110,7 +137,7 @@ fn pinned_grid(state: &AppState, layout: LayoutConfig) -> Element<'_, Message> {
     if views.is_empty() {
         return text("Loading driver details...")
             .size(12)
-            .color(MUTED)
+            .color(muted())
             .into();
     }
 

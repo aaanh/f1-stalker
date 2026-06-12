@@ -8,7 +8,7 @@ use crate::domain::{
 };
 use crate::state::{AppState, Message};
 use crate::ui::layout::LayoutConfig;
-use crate::ui::theme::{FLAG_BLUE, FLAG_GREEN, FLAG_YELLOW, MUTED};
+use crate::ui::theme::{FLAG_BLUE, FLAG_GREEN, FLAG_YELLOW, muted};
 
 pub fn meeting_weather_panel<'a>(
     state: &'a AppState,
@@ -37,8 +37,8 @@ fn forecast_column(
     let value_size = layout.card_detail_size;
 
     let body = match panel.map(|panel| &panel.forecast) {
-        None => text("Loading…").size(value_size).color(MUTED),
-        Some(ForecastState::Loading) => text("Loading…").size(value_size).color(MUTED),
+        None => text("Loading…").size(value_size).color(muted()),
+        Some(ForecastState::Loading) => text("Loading…").size(value_size).color(muted()),
         Some(ForecastState::Ready(forecast)) => {
             text(format_forecast_summary(forecast)).size(value_size).color(FLAG_BLUE)
         }
@@ -48,7 +48,7 @@ fn forecast_column(
     };
 
     column![
-        text("Forecast").size(label_size).color(MUTED),
+        text("Forecast").size(label_size).color(muted()),
         body,
     ]
     .spacing(4)
@@ -60,11 +60,11 @@ fn track_column(panel: Option<&WeatherPanel>, layout: LayoutConfig) -> Element<'
     let value_size = layout.card_detail_size;
 
     let body = match panel.map(|panel| &panel.track) {
-        None => text("Loading…").size(value_size).color(MUTED),
+        None => text("Loading…").size(value_size).color(muted()),
         Some(TrackState::NoSessionData) => {
-            text("No session data yet").size(value_size).color(MUTED)
+            text("No session data yet").size(value_size).color(muted())
         }
-        Some(TrackState::Loading) => text("Loading…").size(value_size).color(MUTED),
+        Some(TrackState::Loading) => text("Loading…").size(value_size).color(muted()),
         Some(TrackState::Ready(track)) => {
             text(format_track_summary(track)).size(value_size).color(FLAG_GREEN)
         }
@@ -74,7 +74,7 @@ fn track_column(panel: Option<&WeatherPanel>, layout: LayoutConfig) -> Element<'
     };
 
     column![
-        text("Track").size(label_size).color(MUTED),
+        text("Track").size(label_size).color(muted()),
         body,
     ]
     .spacing(4)
