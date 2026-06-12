@@ -19,6 +19,8 @@ sha2 = "0.10"
 bytes = "1"
 image = { version = "0.24", default-features = false, features = ["png"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+notify-rust = "4.11"
+tray-icon = "0.19"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.5.2"
@@ -30,9 +32,15 @@ objc2-app-kit = { version = "0.2.2", features = [
     "NSImage",
     "NSMenu",
     "NSMenuItem",
+    "NSEvent",
     "NSRunningApplication",
 ] }
 objc2-foundation = { version = "0.2.2", features = ["NSProcessInfo", "NSString"] }
 
 [dev-dependencies]
 pretty_assertions = "1.4"
+
+[package.metadata.cargo-watch]
+watch = ["src", "../openf1-client/sdks/rust/openf1/src"]
+ignore = ["target", "**/*.rs.bk"]
+delay = 0.3

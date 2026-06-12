@@ -4,6 +4,7 @@ mod data;
 mod db;
 mod debug;
 mod domain;
+mod platform;
 mod state;
 mod ui;
 
