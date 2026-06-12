@@ -5,7 +5,7 @@ use openf1::{
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::domain::grid::{build_grid_slots, find_gp_qualifying, GridSlot};
+use crate::domain::grid::{build_grid_slots, find_gp_qualifying, find_sprint_qualifying, GridSlot};
 
 #[derive(Debug, Error)]
 pub enum FetchError {
@@ -83,6 +83,30 @@ pub async fn fetch_quali_grid(
     };
 
     let grid = fetch_starting_grid(quali.session_key).await?;
+    let slots = build_grid_slots(&grid, pinned_numbers);
+
+    Ok(QualiGridData {
+        meeting_key,
+        slots,
+        fetched_at: now,
+    })
+}
+
+pub async fn fetch_sprint_quali_grid(
+    meeting_key: i64,
+    sessions: &[Session],
+    pinned_numbers: &[i64],
+) -> Result<QualiGridData, FetchError> {
+    let now = Utc::now();
+    let Some(sprint_quali) = find_sprint_qualifying(sessions, meeting_key) else {
+        return Ok(QualiGridData {
+            meeting_key,
+            slots: Vec::new(),
+            fetched_at: now,
+        });
+    };
+
+    let grid = fetch_starting_grid(sprint_quali.session_key).await?;
     let slots = build_grid_slots(&grid, pinned_numbers);
 
     Ok(QualiGridData {

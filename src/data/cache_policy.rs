@@ -29,6 +29,9 @@ pub fn championship_needs_refresh(
     completed
         .iter()
         .any(|(_, session)| !cached_sessions.contains(&session.session_key))
+        || cached
+            .map(|data| data.rounds.iter().any(|round| round.race_results.is_empty()))
+            .unwrap_or(false)
 }
 
 pub fn weekend_weather_needs_refresh(
@@ -65,7 +68,7 @@ pub fn quali_grid_needs_refresh(
 mod tests {
     use super::*;
     use crate::domain::championship::{
-        DriverStandingSnapshot, TeamStandingSnapshot,
+        DriverStandingSnapshot, RaceResultSnapshot, TeamStandingSnapshot,
     };
 
     fn sample_session(key: i64, end: &str) -> Session {
@@ -105,6 +108,7 @@ mod tests {
                 meeting_key: 1,
                 drivers: vec![],
                 teams: vec![],
+                race_results: vec![],
             }],
             fetched_at: now,
         };
@@ -128,11 +132,21 @@ mod tests {
                     driver_number: 1,
                     position: 1,
                     points: 25,
+                    race_points: 25,
                 }],
                 teams: vec![TeamStandingSnapshot {
                     team_name: "Team".into(),
                     position: 1,
                     points: 43,
+                    race_points: 43,
+                }],
+                race_results: vec![RaceResultSnapshot {
+                    driver_number: 1,
+                    classified_position: 1,
+                    dnf: false,
+                    dns: false,
+                    dsq: false,
+                    points: 25,
                 }],
             }],
             fetched_at: now,

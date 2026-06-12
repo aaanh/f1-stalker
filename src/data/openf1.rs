@@ -3,7 +3,8 @@ use openf1::{Meeting, Session, OpenF1Client, OpenF1Error, MeetingsListParams, Se
 use thiserror::Error;
 
 use crate::domain::{
-    compute_race_triplet, next_season_countdown, CountdownTarget, RaceTriplet,
+    calendar_filter::is_testing_meeting, compute_race_triplet, next_season_countdown,
+    CountdownTarget, RaceTriplet,
 };
 
 #[derive(Debug, Error)]
@@ -22,6 +23,27 @@ pub struct CalendarData {
     pub triplet: RaceTriplet,
     pub countdown: CountdownTarget,
     pub fetched_at: DateTime<Utc>,
+}
+
+impl CalendarData {
+    pub fn apply_preferences(&mut self, include_testing: bool) {
+        if !include_testing {
+            self.meetings.retain(|meeting| !is_testing_meeting(meeting));
+            let allowed: std::collections::HashSet<i64> = self
+                .meetings
+                .iter()
+                .map(|meeting| meeting.meeting_key)
+                .collect();
+            self.sessions
+                .retain(|session| allowed.contains(&session.meeting_key));
+        }
+
+        let now = Utc::now();
+        if let Some(triplet) = compute_race_triplet(&self.meetings, now) {
+            self.triplet = triplet;
+        }
+        self.countdown = next_season_countdown(&self.meetings, &self.sessions, now);
+    }
 }
 
 pub async fn fetch_season_calendar(season: i32) -> Result<CalendarData, FetchError> {

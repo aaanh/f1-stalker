@@ -4,13 +4,16 @@ use chrono::{DateTime, Utc};
 use openf1::Meeting;
 use thiserror::Error;
 
-use crate::data::grid::{fetch_quali_grid, QualiGridData};
+use crate::data::grid::{fetch_quali_grid, fetch_sprint_quali_grid, QualiGridData};
 use crate::data::open_meteo::{self, ForecastData};
 use crate::data::track_weather::{fetch_track_weather, TrackWeatherData};
 use crate::domain::weather::{
     ForecastState, TrackState, WeatherPanel,
 };
-use crate::domain::{find_gp_qualifying, quali_grid_visibility, QualiGridVisibility};
+use crate::domain::{
+    find_gp_qualifying, find_sprint_qualifying, quali_grid_visibility, sprint_grid_visibility,
+    QualiGridVisibility,
+};
 use openf1::Session;
 
 #[derive(Debug, Error)]
@@ -25,6 +28,8 @@ pub enum FetchError {
 pub struct WeekendDetailData {
     pub quali_grid: Option<QualiGridData>,
     pub quali_visibility: QualiGridVisibility,
+    pub sprint_grid: Option<QualiGridData>,
+    pub sprint_visibility: QualiGridVisibility,
     pub weather_by_meeting: HashMap<i64, WeatherPanel>,
     pub forecasts_to_cache: Vec<ForecastData>,
     pub tracks_to_cache: Vec<TrackWeatherData>,
@@ -37,6 +42,7 @@ pub struct WeekendFetchInput {
     pub sessions: Vec<Session>,
     pub pinned_numbers: Vec<i64>,
     pub cached_grid: Option<QualiGridData>,
+    pub cached_sprint_grid: Option<QualiGridData>,
     pub cached_track: HashMap<i64, TrackWeatherData>,
     pub cached_forecasts: HashMap<i64, ForecastData>,
 }
@@ -80,17 +86,65 @@ pub async fn fetch_weekend_details(input: WeekendFetchInput) -> Result<WeekendDe
         grid_available,
     );
 
+    let sprint_quali = find_sprint_qualifying(&input.sessions, input.focus_meeting_key);
+    let sprint_grid = if input.pinned_numbers.is_empty() {
+        None
+    } else if let Some(cached) = input
+        .cached_sprint_grid
+        .clone()
+        .filter(|data| !data.slots.is_empty())
+    {
+        Some(cached)
+    } else if sprint_quali.is_some() {
+        match fetch_sprint_quali_grid(
+            input.focus_meeting_key,
+            &input.sessions,
+            &input.pinned_numbers,
+        )
+        .await
+        {
+            Ok(data) if !data.slots.is_empty() => Some(data),
+            Ok(_) => input.cached_sprint_grid,
+            Err(_) => input.cached_sprint_grid,
+        }
+    } else {
+        None
+    };
+
+    let sprint_grid_available = sprint_grid
+        .as_ref()
+        .map(|data| !data.slots.is_empty())
+        .unwrap_or(false);
+    let sprint_visibility = sprint_grid_visibility(
+        !input.pinned_numbers.is_empty(),
+        sprint_quali,
+        now,
+        sprint_grid_available,
+    );
+
     let mut weather_by_meeting = HashMap::new();
     let mut forecasts_to_cache = Vec::new();
     let mut tracks_to_cache = Vec::new();
 
     for meeting in &input.meetings {
-        let track = if let Some(cached) = input.cached_track.get(&meeting.meeting_key) {
-            cached.clone()
+        let (_track, track_state) = if let Some(cached) = input.cached_track.get(&meeting.meeting_key) {
+            (cached.clone(), track_state_from_data(cached))
         } else {
-            let fetched = fetch_track_weather(meeting.meeting_key, &input.sessions).await?;
-            tracks_to_cache.push(fetched.clone());
-            fetched
+            match fetch_track_weather(meeting.meeting_key, &input.sessions).await {
+                Ok(fetched) => {
+                    let state = track_state_from_data(&fetched);
+                    tracks_to_cache.push(fetched.clone());
+                    (fetched, state)
+                }
+                Err(error) => (
+                    TrackWeatherData {
+                        meeting_key: meeting.meeting_key,
+                        conditions: None,
+                        fetched_at: now,
+                    },
+                    TrackState::Error(error.to_string()),
+                ),
+            }
         };
 
         let forecast_state = if let Some(cached) = input.cached_forecasts.get(&meeting.meeting_key) {
@@ -103,11 +157,6 @@ pub async fn fetch_weekend_details(input: WeekendFetchInput) -> Result<WeekendDe
                 }
                 Err(error) => ForecastState::Error(error.to_string()),
             }
-        };
-
-        let track_state = match track.conditions {
-            Some(conditions) => TrackState::Ready(conditions),
-            None => TrackState::NoSessionData,
         };
 
         weather_by_meeting.insert(
@@ -123,6 +172,8 @@ pub async fn fetch_weekend_details(input: WeekendFetchInput) -> Result<WeekendDe
     Ok(WeekendDetailData {
         quali_grid,
         quali_visibility,
+        sprint_grid,
+        sprint_visibility,
         weather_by_meeting,
         forecasts_to_cache,
         tracks_to_cache,
@@ -136,6 +187,7 @@ pub fn assemble_weekend_from_cache(
     sessions: &[Session],
     pinned_numbers: &[i64],
     cached_grid: Option<QualiGridData>,
+    cached_sprint_grid: Option<QualiGridData>,
     cached_track: &HashMap<i64, TrackWeatherData>,
     cached_forecasts: &HashMap<i64, ForecastData>,
 ) -> Option<WeekendDetailData> {
@@ -157,6 +209,19 @@ pub fn assemble_weekend_from_cache(
         grid_available,
     );
 
+    let sprint_quali = find_sprint_qualifying(sessions, focus_meeting_key);
+    let sprint_grid = cached_sprint_grid;
+    let sprint_grid_available = sprint_grid
+        .as_ref()
+        .map(|data| !data.slots.is_empty())
+        .unwrap_or(false);
+    let sprint_visibility = sprint_grid_visibility(
+        !pinned_numbers.is_empty(),
+        sprint_quali,
+        now,
+        sprint_grid_available,
+    );
+
     let mut weather_by_meeting = HashMap::new();
     for meeting in meetings {
         let forecast_state = if let Some(cached) = cached_forecasts.get(&meeting.meeting_key) {
@@ -166,10 +231,7 @@ pub fn assemble_weekend_from_cache(
         };
 
         let track_state = if let Some(cached) = cached_track.get(&meeting.meeting_key) {
-            match &cached.conditions {
-                Some(conditions) => TrackState::Ready(conditions.clone()),
-                None => TrackState::NoSessionData,
-            }
+            track_state_from_data(cached)
         } else {
             TrackState::Loading
         };
@@ -187,6 +249,8 @@ pub fn assemble_weekend_from_cache(
     Some(WeekendDetailData {
         quali_grid,
         quali_visibility,
+        sprint_grid,
+        sprint_visibility,
         weather_by_meeting,
         forecasts_to_cache: Vec::new(),
         tracks_to_cache: Vec::new(),
@@ -204,4 +268,11 @@ pub fn meetings_for_weather(triplet: &crate::domain::RaceTriplet) -> Vec<Meeting
         meetings.push(triplet.upcoming.clone());
     }
     meetings
+}
+
+fn track_state_from_data(track: &TrackWeatherData) -> TrackState {
+    match &track.conditions {
+        Some(conditions) => TrackState::Ready(conditions.clone()),
+        None => TrackState::NoSessionData,
+    }
 }
