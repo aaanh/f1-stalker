@@ -1,7 +1,20 @@
+use crate::ui::theme::ThemePresetId;
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Settings {
     pub season_year: i32,
     pub timezone: String,
+    pub first_run_complete: bool,
+    pub theme_id: ThemePresetId,
+    pub background_on_close: bool,
+    pub include_testing: bool,
+    pub notifications_enabled: bool,
+    pub notify_standings: bool,
+    pub notify_sessions: bool,
+    pub session_reminder_minutes: i64,
+    pub rival_driver_first: i64,
+    pub rival_driver_second: i64,
+    pub rival_compare_active: bool,
 }
 
 impl Settings {
@@ -19,6 +32,17 @@ impl Default for Settings {
         Self {
             season_year: 0,
             timezone: crate::db::schema::DEFAULT_TIMEZONE.into(),
+            first_run_complete: false,
+            theme_id: ThemePresetId::Dark,
+            background_on_close: false,
+            include_testing: false,
+            notifications_enabled: true,
+            notify_standings: true,
+            notify_sessions: false,
+            session_reminder_minutes: 60,
+            rival_driver_first: 0,
+            rival_driver_second: 0,
+            rival_compare_active: false,
         }
     }
 }

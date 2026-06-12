@@ -27,6 +27,19 @@ CREATE TABLE IF NOT EXISTS asset_cache (
 
 pub const SETTING_SEASON_YEAR: &str = "season_year";
 pub const SETTING_TIMEZONE: &str = "timezone";
+pub const SETTING_FIRST_RUN_COMPLETE: &str = "first_run_complete";
+pub const SETTING_THEME_ID: &str = "theme_id";
+pub const SETTING_BACKGROUND_ON_CLOSE: &str = "background_on_close";
+pub const SETTING_INCLUDE_TESTING: &str = "include_testing";
+pub const SETTING_NOTIFICATIONS_ENABLED: &str = "notifications_enabled";
+pub const SETTING_NOTIFY_STANDINGS: &str = "notify_standings";
+pub const SETTING_NOTIFY_SESSIONS: &str = "notify_sessions";
+pub const SETTING_SESSION_REMINDER_MINUTES: &str = "session_reminder_minutes";
+pub const SETTING_LAST_STANDINGS_SIGNATURE: &str = "last_standings_signature";
+pub const SETTING_LAST_SESSION_REMINDER: &str = "last_session_reminder";
+pub const SETTING_RIVAL_DRIVER_FIRST: &str = "rival_driver_first";
+pub const SETTING_RIVAL_DRIVER_SECOND: &str = "rival_driver_second";
+pub const SETTING_RIVAL_COMPARE_ACTIVE: &str = "rival_compare_active";
 pub const DEFAULT_TIMEZONE: &str = "system";
 pub const CALENDAR_CACHE_TTL_SECS: i64 = 21_600;
 pub const DRIVERS_CACHE_TTL_SECS: i64 = 21_600;

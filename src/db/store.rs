@@ -17,9 +17,17 @@ use crate::db::schema::{
     quali_grid_cache_key, schema_sql, track_weather_cache_key, ASSET_CACHE_TTL_SECS,
     ASSET_FAILED_TTL_SECS, CALENDAR_CACHE_TTL_SECS, CHAMPIONSHIP_CACHE_TTL_SECS,
     DRIVERS_CACHE_TTL_SECS, FORECAST_CACHE_TTL_SECS, QUALI_GRID_CACHE_TTL_SECS,
-    SETTING_SEASON_YEAR, SETTING_TIMEZONE, TRACK_WEATHER_CACHE_TTL_SECS,
+    SETTING_BACKGROUND_ON_CLOSE, SETTING_FIRST_RUN_COMPLETE, SETTING_INCLUDE_TESTING,
+    SETTING_NOTIFICATIONS_ENABLED,     SETTING_NOTIFY_SESSIONS, SETTING_NOTIFY_STANDINGS,
+    SETTING_RIVAL_COMPARE_ACTIVE, SETTING_RIVAL_DRIVER_FIRST, SETTING_RIVAL_DRIVER_SECOND,
+    SETTING_SEASON_YEAR, SETTING_SESSION_REMINDER_MINUTES, SETTING_THEME_ID, SETTING_TIMEZONE,
+    TRACK_WEATHER_CACHE_TTL_SECS,
 };
 use crate::db::Settings;
+
+fn parse_bool(value: &str) -> bool {
+    matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes")
+}
 
 #[derive(Debug, Error)]
 pub enum DbError {
@@ -95,6 +103,35 @@ impl Database {
                     }
                 }
                 SETTING_TIMEZONE if !value.is_empty() => settings.timezone = value,
+                SETTING_FIRST_RUN_COMPLETE => settings.first_run_complete = parse_bool(&value),
+                SETTING_THEME_ID => {
+                    settings.theme_id = crate::ui::theme::ThemePresetId::from_key(&value)
+                }
+                SETTING_BACKGROUND_ON_CLOSE => settings.background_on_close = parse_bool(&value),
+                SETTING_INCLUDE_TESTING => settings.include_testing = parse_bool(&value),
+                SETTING_NOTIFICATIONS_ENABLED => {
+                    settings.notifications_enabled = parse_bool(&value)
+                }
+                SETTING_NOTIFY_STANDINGS => settings.notify_standings = parse_bool(&value),
+                SETTING_NOTIFY_SESSIONS => settings.notify_sessions = parse_bool(&value),
+                SETTING_SESSION_REMINDER_MINUTES => {
+                    if let Ok(minutes) = value.parse() {
+                        settings.session_reminder_minutes = minutes;
+                    }
+                }
+                SETTING_RIVAL_DRIVER_FIRST => {
+                    if let Ok(number) = value.parse() {
+                        settings.rival_driver_first = number;
+                    }
+                }
+                SETTING_RIVAL_DRIVER_SECOND => {
+                    if let Ok(number) = value.parse() {
+                        settings.rival_driver_second = number;
+                    }
+                }
+                SETTING_RIVAL_COMPARE_ACTIVE => {
+                    settings.rival_compare_active = parse_bool(&value)
+                }
                 _ => {}
             }
         }
@@ -105,7 +142,57 @@ impl Database {
     pub fn save_settings(&self, settings: &Settings) -> Result<(), DbError> {
         self.set_setting(SETTING_SEASON_YEAR, settings.season_year.to_string())?;
         self.set_setting(SETTING_TIMEZONE, settings.timezone.clone())?;
+        self.set_setting(
+            SETTING_FIRST_RUN_COMPLETE,
+            settings.first_run_complete.to_string(),
+        )?;
+        self.set_setting(SETTING_THEME_ID, settings.theme_id.key().into())?;
+        self.set_setting(
+            SETTING_BACKGROUND_ON_CLOSE,
+            settings.background_on_close.to_string(),
+        )?;
+        self.set_setting(
+            SETTING_INCLUDE_TESTING,
+            settings.include_testing.to_string(),
+        )?;
+        self.set_setting(
+            SETTING_NOTIFICATIONS_ENABLED,
+            settings.notifications_enabled.to_string(),
+        )?;
+        self.set_setting(SETTING_NOTIFY_STANDINGS, settings.notify_standings.to_string())?;
+        self.set_setting(SETTING_NOTIFY_SESSIONS, settings.notify_sessions.to_string())?;
+        self.set_setting(
+            SETTING_SESSION_REMINDER_MINUTES,
+            settings.session_reminder_minutes.to_string(),
+        )?;
+        self.set_setting(
+            SETTING_RIVAL_DRIVER_FIRST,
+            settings.rival_driver_first.to_string(),
+        )?;
+        self.set_setting(
+            SETTING_RIVAL_DRIVER_SECOND,
+            settings.rival_driver_second.to_string(),
+        )?;
+        self.set_setting(
+            SETTING_RIVAL_COMPARE_ACTIVE,
+            settings.rival_compare_active.to_string(),
+        )?;
         Ok(())
+    }
+
+    pub fn load_setting(&self, key: &str) -> Result<Option<String>, DbError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT value FROM settings WHERE key = ?1")?;
+        let mut rows = stmt.query(params![key])?;
+        let Some(row) = rows.next()? else {
+            return Ok(None);
+        };
+        Ok(Some(row.get(0)?))
+    }
+
+    pub fn save_setting(&self, key: &str, value: impl AsRef<str>) -> Result<(), DbError> {
+        self.set_setting(key, value.as_ref().into())
     }
 
     fn set_setting(&self, key: &str, value: String) -> Result<(), DbError> {
@@ -737,6 +824,7 @@ mod tests {
         let settings = Settings {
             season_year: 2026,
             timezone: "Europe/London".into(),
+            ..Settings::default()
         };
         db.save_settings(&settings).unwrap();
         let loaded = db.load_settings().unwrap();
