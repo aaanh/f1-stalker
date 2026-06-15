@@ -1,0 +1,4 @@
+{
+  "typescript.tsdk": "f1-stalker-site/node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true
+}
