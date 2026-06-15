@@ -2,6 +2,7 @@ import { APP_VERSION, releaseDownloads } from "@/lib/releases"
 import { Logo } from "@/components/logo"
 import { ButtonGroup } from "./components/ui/button-group"
 import { Button, buttonVariants } from "./components/ui/button"
+import React from "react"
 
 export function App() {
   return (
@@ -81,21 +82,30 @@ export function App() {
                 </Button>
               ))}
             </ButtonGroup>
+            <h2>Demo video</h2>
+            <iframe
+              src="https://www.linkedin.com/embed/feed/update/urn:li:ugcPost:7471070502682411008?collapsed=1"
+              height="720"
+              width="100%"
+              allowFullScreen={true}
+              className="w-full"
+              title="Embedded post"
+            ></iframe>
             <h2>Screenshots</h2>
-            <img
-              className="rounded-lg border border-red-500 p-1 shadow-lg"
-              src="/f1-stalker-screenshot-0.png"
-              width={800}
-              height={600}
-              alt="F1 Stalker dashboard screenshot"
-            />
-            <img
-              className="rounded-lg border border-red-500 p-1 shadow-lg"
-              src="/f1-stalker-screenshot-1.png"
-              width={800}
-              height={600}
-              alt="F1 Stalker championship screenshot"
-            />
+            {[...Array(6).keys()].map((num) => (
+              <React.Fragment key={`screenshot-${num}`}>
+                <p className="text-2xl">
+                  <strong>P{num + 1}</strong>
+                </p>
+                <img
+                  className="rounded-lg border border-red-500 p-1 shadow-lg"
+                  src={`/f1-stalker-screenshot-${num}.png`}
+                  width={800}
+                  height={600}
+                  alt="F1 Stalker dashboard screenshot"
+                />
+              </React.Fragment>
+            ))}
             <h2>Troubleshoot</h2>
             <p>
               <b>macOS Gatekeeper blocks the app from running:</b> Right-click
