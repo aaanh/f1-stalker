@@ -21,6 +21,7 @@ use crate::db::schema::{
     SETTING_NOTIFICATIONS_ENABLED,     SETTING_NOTIFY_SESSIONS, SETTING_NOTIFY_STANDINGS,
     SETTING_RIVAL_COMPARE_ACTIVE, SETTING_RIVAL_DRIVER_FIRST, SETTING_RIVAL_DRIVER_SECOND,
     SETTING_SEASON_YEAR, SETTING_SESSION_REMINDER_MINUTES, SETTING_THEME_ID, SETTING_TIMEZONE,
+    SETTING_FONT_SCALE, SETTING_STANDINGS_MODE, SETTING_STANDINGS_TAB,
     TRACK_WEATHER_CACHE_TTL_SECS,
 };
 use crate::db::Settings;
@@ -132,6 +133,20 @@ impl Database {
                 SETTING_RIVAL_COMPARE_ACTIVE => {
                     settings.rival_compare_active = parse_bool(&value)
                 }
+                SETTING_FONT_SCALE => {
+                    if let Ok(scale) = value.parse::<f32>() {
+                        settings.font_scale =
+                            crate::ui::layout::clamp_font_scale(scale);
+                    }
+                }
+                SETTING_STANDINGS_TAB => {
+                    settings.standings_tab =
+                        crate::domain::ChampionshipTab::from_key(&value);
+                }
+                SETTING_STANDINGS_MODE => {
+                    settings.standings_mode =
+                        crate::domain::ChartMode::from_key(&value);
+                }
                 _ => {}
             }
         }
@@ -176,6 +191,18 @@ impl Database {
         self.set_setting(
             SETTING_RIVAL_COMPARE_ACTIVE,
             settings.rival_compare_active.to_string(),
+        )?;
+        self.set_setting(
+            SETTING_FONT_SCALE,
+            format!("{:.2}", settings.font_scale),
+        )?;
+        self.set_setting(
+            SETTING_STANDINGS_TAB,
+            settings.standings_tab.key().into(),
+        )?;
+        self.set_setting(
+            SETTING_STANDINGS_MODE,
+            settings.standings_mode.key().into(),
         )?;
         Ok(())
     }

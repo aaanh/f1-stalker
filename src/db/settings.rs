@@ -15,6 +15,9 @@ pub struct Settings {
     pub rival_driver_first: i64,
     pub rival_driver_second: i64,
     pub rival_compare_active: bool,
+    pub font_scale: f32,
+    pub standings_tab: crate::domain::ChampionshipTab,
+    pub standings_mode: crate::domain::ChartMode,
 }
 
 impl Settings {
@@ -43,6 +46,9 @@ impl Default for Settings {
             rival_driver_first: 0,
             rival_driver_second: 0,
             rival_compare_active: false,
+            font_scale: crate::ui::layout::FONT_SCALE_DEFAULT,
+            standings_tab: crate::domain::ChampionshipTab::Drivers,
+            standings_mode: crate::domain::ChartMode::Championship,
         }
     }
 }

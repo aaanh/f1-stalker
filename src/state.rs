@@ -48,7 +48,6 @@ impl ScrollbarVisibility {
     }
 }
 
-pub const MAX_PINNED_DRIVERS: usize = crate::domain::MAX_PINNED_DRIVERS;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Screen {
@@ -228,6 +227,8 @@ pub enum Message {
     WeekendFetched(Result<WeekendDetailData, String>),
     ChampionshipTabSelected(ChampionshipTab),
     ChampionshipChartModeSelected(ChartMode),
+    StandingsTabSelected(ChampionshipTab),
+    StandingsModeSelected(ChartMode),
     ChampionshipChartHover(Option<ChartHoverHit>),
     Tick,
     WindowResized(Size),
@@ -236,8 +237,11 @@ pub enum Message {
     HideToBackground(window::Mode),
     WindowAction(WindowAction),
     TitleBarPressed,
-    TitleBarDrag,
+    TitleBarReleased,
+    TitleBarMoved,
     TitleBarControlsHover(bool),
+    FontScaleDelta(i8),
+    FontScaleReset,
     ThemeSelected(crate::ui::theme::ThemePresetId),
     ActivateRivalCompare,
     ExitRivalCompare,
@@ -397,9 +401,6 @@ impl AppState {
         self.headshot_failed.contains(url)
     }
 
-    pub fn can_add_pin(&self) -> bool {
-        self.pinned_drivers.len() < MAX_PINNED_DRIVERS
-    }
 }
 
 fn calendar_stale(state: &AppState) -> bool {
