@@ -5,12 +5,17 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 version="$(awk -F'"' '/^version = / { print $2; exit }' "$root/Cargo.toml")"
 site_dir="$root/f1-stalker-site/public/downloads/v$version"
 
-macos_dmg="$root/target/F1-Stalker-${version}-macos-arm64.dmg"
-linux_bin="$root/target/release/f1-stalker"
+macos_arm64_dmg="$root/target/F1-Stalker-${version}-macos-arm64.dmg"
+macos_universal_dmg="$root/target/F1-Stalker-${version}-macos-universal.dmg"
+linux_bin="$root/target/x86_64-unknown-linux-gnu/release/f1-stalker"
+if [[ ! -f "$linux_bin" ]]; then
+  linux_bin="$root/target/release/f1-stalker"
+fi
 windows_exe="$root/target/x86_64-pc-windows-gnu/release/f1-stalker.exe"
 
 missing=()
-[[ -f "$macos_dmg" ]] || missing+=("$macos_dmg")
+[[ -f "$macos_arm64_dmg" ]] || missing+=("$macos_arm64_dmg")
+[[ -f "$macos_universal_dmg" ]] || missing+=("$macos_universal_dmg")
 [[ -f "$linux_bin" ]] || missing+=("$linux_bin")
 [[ -f "$windows_exe" ]] || missing+=("$windows_exe")
 
@@ -22,7 +27,8 @@ fi
 
 mkdir -p "$site_dir"
 
-cp "$macos_dmg" "$site_dir/"
+cp "$macos_arm64_dmg" "$site_dir/"
+cp "$macos_universal_dmg" "$site_dir/"
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
@@ -46,6 +52,11 @@ export type ReleaseDownload = {
 }
 
 export const releaseDownloads: ReleaseDownload[] = [
+  {
+    label: "macOS Universal",
+    href: "/downloads/v${version}/F1-Stalker-${version}-macos-universal.dmg",
+    fileName: "F1-Stalker-${version}-macos-universal.dmg",
+  },
   {
     label: "macOS ARM64",
     href: "/downloads/v${version}/F1-Stalker-${version}-macos-arm64.dmg",

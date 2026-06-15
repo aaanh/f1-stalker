@@ -3,8 +3,9 @@ set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 profile="${1:-debug}"
-binary="$root/target/$profile/f1-stalker"
+binary="${2:-$root/target/$profile/f1-stalker}"
 app="$root/target/F1 Stalker.app"
+version="$(awk -F'"' '/^version = / { print $2; exit }' "$root/Cargo.toml")"
 
 if [[ ! -f "$binary" ]]; then
   echo "missing binary: $binary (run: cargo build --profile $profile)" >&2
@@ -15,7 +16,7 @@ mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 
 cp "$binary" "$app/Contents/MacOS/F1 Stalker"
 
-cat >"$app/Contents/Info.plist" <<'EOF'
+cat >"$app/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -35,9 +36,9 @@ cat >"$app/Contents/Info.plist" <<'EOF'
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.1.0</string>
+  <string>${version}</string>
   <key>CFBundleVersion</key>
-  <string>0.1.0</string>
+  <string>${version}</string>
   <key>LSMinimumSystemVersion</key>
   <string>11.0</string>
   <key>NSHighResolutionCapable</key>
