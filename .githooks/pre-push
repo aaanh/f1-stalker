@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+remote="${1:-}"
+
+# Mirror to GitHub only when pushing to the canonical GitLab remote.
+if [ "$remote" != "origin" ]; then
+  exit 0
+fi
+
+if ! git remote get-url github >/dev/null 2>&1; then
+  echo "pre-push: github remote not configured; run scripts/setup-githooks.sh" >&2
+  exit 0
+fi
+
+mirror_push=()
+mirror_delete=()
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  if [ -z "${local_ref:-}" ]; then
+    continue
+  fi
+
+  if [ "$local_sha" = "0000000000000000000000000000000000000000" ]; then
+    mirror_delete+=("$remote_ref")
+  else
+    mirror_push+=("$local_ref" "$remote_ref")
+  fi
+done
+
+if [ "${#mirror_push[@]}" -eq 0 ] && [ "${#mirror_delete[@]}" -eq 0 ]; then
+  exit 0
+fi
+
+git_pid="$PPID"
+
+(
+  while kill -0 "$git_pid" 2>/dev/null; do
+    sleep 0.2
+  done
+
+  i=0
+  while [ "$i" -lt "${#mirror_push[@]}" ]; do
+    git push github "${mirror_push[$i]}:${mirror_push[$i + 1]}" --quiet
+    i=$((i + 2))
+  done
+
+  for remote_ref in "${mirror_delete[@]}"; do
+    ref_name="${remote_ref#refs/heads/}"
+    ref_name="${ref_name#refs/tags/}"
+    git push github --delete "$ref_name" --quiet 2>/dev/null || true
+  done
+
+  echo "pre-push: mirrored to github"
+) &
+
+exit 0
