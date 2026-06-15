@@ -7,34 +7,6 @@ import React from "react"
 export function App() {
   return (
     <>
-      <head>
-        <title>F1 Stalker</title>
-        <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png" />
-        <link
-          rel="apple-touch-icon"
-          sizes="180x180"
-          href="/apple-touch-icon.png"
-        />
-        <meta
-          name="description"
-          content="Track Formula One race results, standings, and upcoming races. Built for fans who live and breathe the drama."
-        />
-        <meta name="application-name" content="F1 Stalker" />
-        <meta name="theme-color" content="#b91c1c" />
-        <meta property="og:title" content="F1 Stalker" />
-        <meta
-          property="og:description"
-          content="Track Formula One race results, standings, and upcoming races. Built for fans who live and breathe the drama."
-        />
-        <meta property="og:type" content="website" />
-        <meta property="og:site_name" content="F1 Stalker" />
-        <meta name="twitter:card" content="summary" />
-        <meta name="twitter:title" content="F1 Stalker" />
-        <meta
-          name="twitter:description"
-          content="Track Formula One race results, standings, and upcoming races. Built for fans who live and breathe the drama."
-        />
-      </head>
       <div className="flex min-h-svh w-full flex-col bg-neutral-800">
         <header className="fixed flex w-full items-center justify-between gap-2 bg-background p-4">
           <div className="flex items-center gap-2">
@@ -42,7 +14,7 @@ export function App() {
               className="rounded-full border border-red-500 p-1"
               size={48}
             />
-            <h1 className="text-4xl">F1 Stalker</h1>
+            <h1 className="hidden text-4xl sm:block">F1 Stalker</h1>
           </div>
           <ButtonGroup className="flex flex-wrap">
             <a
@@ -59,9 +31,9 @@ export function App() {
             </a>
           </ButtonGroup>
         </header>
-        <div className="container mx-auto py-24 pb-12">
-          <main className="mx-auto prose rounded-lg bg-neutral-900 p-4 lg:prose-xl dark:prose-invert">
-            <h2>What?</h2>
+        <div className="container mx-auto px-2 py-24 pb-12">
+          <main className="mx-auto prose rounded-lg bg-neutral-800 p-4 sm:bg-neutral-900 lg:prose-xl dark:prose-invert">
+            <h2>What is F1 Stalker?</h2>
             <p>
               {`You can't get enough of Formula One (TM)? You live and breathe the
               drama, the bottling, and the comedy? Then you're probably just
@@ -73,9 +45,10 @@ export function App() {
             <p>
               Latest release: <strong>v{APP_VERSION}</strong>
             </p>
-            <ButtonGroup>
+            <ButtonGroup className="flex-wrap gap-2">
               {releaseDownloads.map((download) => (
                 <Button key={download.href} asChild>
+                  {/* {download.label.toLowerCase().indexOf("macos") > 0 && ""} */}
                   <a href={download.href} download={download.fileName}>
                     {download.label}
                   </a>
@@ -124,11 +97,9 @@ export function App() {
               This site and the owner/creator of this site are not affiliated
               with the drivers nor the constructors and their sponsors.
             </p>
-            <p>
-              Please contact the site owner via e-mail at{" "}
-              <pre>iam (at) hoanganh (dot) dev</pre> for copyright and trademark
-              infringement concerns.
-            </p>
+            <p>Please contact the site owner via e-mail at </p>
+            <pre>iam (at) hoanganh (dot) dev</pre> for copyright and trademark
+            infringement concerns.
             <p>
               The application F1 Stalker utilizes OpenF1 API to fetch race data.
               It currently only supports data that is 24-hour old. In the
