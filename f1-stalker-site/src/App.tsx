@@ -25,7 +25,7 @@ export function App() {
             </a>
             <a
               className={buttonVariants({ variant: "default" })}
-              href="https://gitlab.com/aaanh/f1-client"
+              href="https://gitlab.com/aaanh/openf1-client"
             >
               GitLab (OpenF1 Client)
             </a>
