@@ -10,9 +10,10 @@ pub mod driver_assets;
 pub mod driver_picker;
 pub mod drivers;
 pub mod time_format;
+pub mod standings;
 pub mod weather;
 
-pub use driver_assets::{driver_flag_iso2, driver_flag_url, team_logo_url};
+pub use driver_assets::{driver_flag_iso2, driver_flag_url, team_logo_display_url, team_logo_url};
 
 pub use calendar::{
     compute_race_triplet, season_phase, RaceTriplet, RaceTripletSlot, SeasonPhase,
@@ -32,7 +33,7 @@ pub use driver_picker::{
 };
 pub use drivers::{
     can_pin, driver_display_name, move_pin, pin_driver, pinned_driver_views, team_colour,
-    unpin_all, unpin_driver, PinDirection, PinnedDriverView, MAX_PINNED_DRIVERS,
+    unpin_all, unpin_driver, PinDirection, PinnedDriverView,
 };
 pub use grid::{
     build_grid_slots, find_gp_qualifying, find_sprint_qualifying, format_gap_to_pole,
@@ -43,6 +44,7 @@ pub use narrative::{
     build_championship_narrative, build_rival_narrative, build_season_complete_narrative,
     standings_signature, ChampionshipNarrative,
 };
+pub use standings::{build_standings, StandingRow};
 pub use weather::{
     format_forecast_summary, format_track_summary, location_query, ForecastDay, ForecastState,
     LocationForecast, TrackConditions, TrackState, WeatherPanel,

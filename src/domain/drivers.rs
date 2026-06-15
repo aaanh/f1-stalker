@@ -4,8 +4,6 @@ use openf1::Driver;
 use crate::db::PinnedDriver;
 use crate::ui::theme::muted;
 
-pub const MAX_PINNED_DRIVERS: usize = 6;
-
 #[derive(Debug, Clone)]
 pub struct PinnedDriverView {
     pub pin: PinnedDriver,
@@ -47,10 +45,9 @@ pub fn pinned_driver_views(pins: &[PinnedDriver], roster: &[Driver]) -> Vec<Pinn
 }
 
 pub fn can_pin(pins: &[PinnedDriver], driver_number: i64) -> bool {
-    pins.len() < MAX_PINNED_DRIVERS
-        && !pins
-            .iter()
-            .any(|pin| pin.driver_number == driver_number)
+    !pins
+        .iter()
+        .any(|pin| pin.driver_number == driver_number)
 }
 
 pub fn pin_driver(pins: &mut Vec<PinnedDriver>, driver_number: i64) -> bool {
@@ -134,12 +131,20 @@ mod tests {
     }
 
     #[test]
-    fn pins_respect_maximum() {
+    fn pins_reject_duplicates() {
         let mut pins = Vec::new();
-        for number in 1..=MAX_PINNED_DRIVERS {
+        assert!(pin_driver(&mut pins, 44));
+        assert!(!pin_driver(&mut pins, 44));
+        assert_eq!(pins.len(), 1);
+    }
+
+    #[test]
+    fn pins_allow_unlimited_drivers() {
+        let mut pins = Vec::new();
+        for number in 1..=20 {
             assert!(pin_driver(&mut pins, number as i64));
         }
-        assert!(!pin_driver(&mut pins, 99));
+        assert_eq!(pins.len(), 20);
     }
 
     #[test]

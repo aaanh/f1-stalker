@@ -5,18 +5,53 @@ use openf1::{Driver, Meeting, Session};
 use crate::db::PinnedDriver;
 use crate::domain::{driver_display_name, team_colour};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ChampionshipTab {
     #[default]
     Drivers,
     Constructors,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ChartMode {
     #[default]
     Championship,
+    #[serde(rename = "race_standing")]
     RaceStanding,
+}
+
+impl ChampionshipTab {
+    pub fn from_key(value: &str) -> Self {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "constructors" => Self::Constructors,
+            _ => Self::Drivers,
+        }
+    }
+
+    pub fn key(self) -> &'static str {
+        match self {
+            Self::Drivers => "drivers",
+            Self::Constructors => "constructors",
+        }
+    }
+}
+
+impl ChartMode {
+    pub fn from_key(value: &str) -> Self {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "race_standing" | "race" => Self::RaceStanding,
+            _ => Self::Championship,
+        }
+    }
+
+    pub fn key(self) -> &'static str {
+        match self {
+            Self::Championship => "championship",
+            Self::RaceStanding => "race_standing",
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -338,7 +373,7 @@ pub fn build_championship_charts(
         .collect::<Vec<_>>();
 
     let (constructor_championship_series, constructor_race_series) =
-        constructor_series(rounds, roster);
+        constructor_series(rounds, roster, &driver_numbers);
 
     ChampionshipCharts {
         round_count,
@@ -357,16 +392,40 @@ pub fn build_championship_charts(
 fn constructor_series(
     rounds: &[ChampionshipRoundSnapshot],
     roster: &[Driver],
+    pinned_driver_numbers: &[i64],
 ) -> (Vec<ChartSeries>, Vec<ChartSeries>) {
     let Some(latest) = rounds.last() else {
         return (Vec::new(), Vec::new());
     };
 
-    let mut teams = latest.teams.clone();
-    teams.sort_by_key(|team| team.position);
-    let top_teams: Vec<_> = teams.into_iter().take(10).collect();
+    let pinned_teams: Vec<String> = pinned_driver_numbers
+        .iter()
+        .filter_map(|driver_number| {
+            roster
+                .iter()
+                .find(|driver| driver.driver_number == *driver_number)
+                .map(|driver| driver.team_name.clone())
+        })
+        .fold(Vec::new(), |mut teams, team| {
+            if !teams.iter().any(|existing| existing == &team) {
+                teams.push(team);
+            }
+            teams
+        });
 
-    let championship = top_teams
+    if pinned_teams.is_empty() {
+        return (Vec::new(), Vec::new());
+    }
+
+    let mut teams = latest
+        .teams
+        .iter()
+        .filter(|team| pinned_teams.iter().any(|name| name == &team.team_name))
+        .cloned()
+        .collect::<Vec<_>>();
+    teams.sort_by_key(|team| team.position);
+
+    let championship = teams
         .iter()
         .map(|team| {
             let points = rounds
@@ -392,7 +451,7 @@ fn constructor_series(
         })
         .collect();
 
-    let race = top_teams
+    let race = teams
         .iter()
         .map(|team| {
             let points = rounds
@@ -648,9 +707,9 @@ mod tests {
         assert_eq!(charts.driver_championship_series[0].points.len(), 2);
         assert_eq!(charts.driver_race_series.len(), 1);
         assert_eq!(charts.driver_race_series[0].points.len(), 2);
-        assert_eq!(charts.constructor_championship_series.len(), 2);
+        assert_eq!(charts.constructor_championship_series.len(), 1);
         assert_eq!(charts.constructor_championship_series[0].label, "Red Bull Racing");
-        assert_eq!(charts.constructor_race_series.len(), 2);
+        assert_eq!(charts.constructor_race_series.len(), 1);
     }
 
     #[test]
@@ -689,8 +748,8 @@ mod tests {
 
         let charts = build_championship_charts(&rounds, &pinned, &roster, &[], &[], None);
         assert_eq!(charts.driver_race_series[0].points[0].position, 4);
+        assert_eq!(charts.constructor_race_series.len(), 1);
         assert_eq!(charts.constructor_race_series[0].points[0].position, 1);
-        assert_eq!(charts.constructor_race_series[1].points[0].position, 2);
     }
 
     #[test]

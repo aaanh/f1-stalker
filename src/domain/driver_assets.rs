@@ -25,9 +25,17 @@ pub fn driver_flag_iso2(
 }
 
 pub fn team_logo_url(team_name: &str) -> Option<String> {
+    team_logo_cdn_url(team_name, 256, 256)
+}
+
+pub fn team_logo_display_url(team_name: &str) -> Option<String> {
+    team_logo_cdn_url(team_name, 480, 192)
+}
+
+fn team_logo_cdn_url(team_name: &str, width: u32, height: u32) -> Option<String> {
     let slug = team_logo_slug(team_name)?;
     Some(format!(
-        "https://media.formula1.com/image/upload/c_lfill,w_64,h_64/f_auto/q_auto/content/dam/fom-website/2018-redesign-assets/team%20logos/{slug}"
+        "https://media.formula1.com/image/upload/c_fit,w_{width},h_{height}/f_auto/q_auto/content/dam/fom-website/2018-redesign-assets/team%20logos/{slug}"
     ))
 }
 
@@ -250,6 +258,16 @@ mod tests {
         let bulls = team_logo_url("Red Bull Racing").unwrap();
         let rb = team_logo_url("Racing Bulls").unwrap();
         assert!(bulls.contains("red%20bull"));
+        assert!(bulls.contains("c_fit"));
+        assert!(!bulls.contains("c_lfill"));
         assert!(rb.contains("/rb"));
+    }
+
+    #[test]
+    fn display_logo_uses_wide_fit_bounds() {
+        let url = team_logo_display_url("Ferrari").unwrap();
+        assert!(url.contains("c_fit"));
+        assert!(url.contains("w_480"));
+        assert!(url.contains("h_192"));
     }
 }
