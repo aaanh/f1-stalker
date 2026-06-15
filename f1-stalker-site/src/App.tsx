@@ -110,7 +110,7 @@ export function App() {
         </div>
       </div>
       <footer className="flex h-32 flex-col items-center justify-center gap-2">
-        <p className="text-center">Copyright &copy; 2026 Anh H. Nguyen</p>
+        <p className="text-center"><a href="https://f1stalker.aaanh.com">F1 Stalker</a> © 2026 by <a href="https://aaanh.com">Anh Nguyen</a> is licensed under <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a><img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/sa.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;"></p>
         <ButtonGroup>
           <a
             className={buttonVariants({ variant: "outline" })}
