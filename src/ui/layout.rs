@@ -1,8 +1,33 @@
 use iced::{Length, Size};
 
+pub const FONT_SCALE_DEFAULT: f32 = 1.0;
+pub const FONT_SCALE_MIN: f32 = 0.85;
+pub const FONT_SCALE_MAX: f32 = 1.35;
+pub const FONT_SCALE_STEP: f32 = 0.05;
+
+pub fn clamp_font_scale(scale: f32) -> f32 {
+    scale.clamp(FONT_SCALE_MIN, FONT_SCALE_MAX)
+}
+
+pub fn adjust_font_scale(scale: f32, delta: i8) -> f32 {
+    let steps = ((scale - FONT_SCALE_MIN) / FONT_SCALE_STEP).round() as i32;
+    let max_steps = ((FONT_SCALE_MAX - FONT_SCALE_MIN) / FONT_SCALE_STEP).round() as i32;
+    let next = (steps + delta as i32).clamp(0, max_steps);
+    clamp_font_scale(FONT_SCALE_MIN + next as f32 * FONT_SCALE_STEP)
+}
+
+pub fn scale_text(base: u16, font_scale: f32) -> u16 {
+    ((base as f32) * font_scale).round().max(8.0) as u16
+}
+
+pub fn scale_px(base: f32, font_scale: f32) -> f32 {
+    base * font_scale
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct LayoutConfig {
     pub viewport: Size,
+    pub font_scale: f32,
     pub padding: f32,
     pub countdown_size: u16,
     pub meeting_title_size: u16,
@@ -20,10 +45,13 @@ pub struct LayoutConfig {
     pub pin_card_stacked: bool,
     pub pin_portrait_size: f32,
     pub pin_name_size: u16,
+    pub pin_code_size: u16,
+    pub pin_team_size: u16,
 }
 
 impl LayoutConfig {
-    pub fn from_viewport(viewport: Size) -> Self {
+    pub fn from_viewport(viewport: Size, font_scale: f32) -> Self {
+        let font_scale = clamp_font_scale(font_scale);
         let width = viewport.width;
         let height = viewport.height;
 
@@ -51,28 +79,37 @@ impl LayoutConfig {
         } else {
             112.0
         };
-        let pin_name_size = if pin_card_stacked {
-            16
-        } else if card_compact {
-            17
-        } else {
-            18
-        };
+        let pin_name_size = scale_text(
+            if pin_card_stacked {
+                18
+            } else if card_compact {
+                19
+            } else {
+                20
+            },
+            font_scale,
+        );
+        let pin_code_size = scale_text(if card_compact { 16 } else { 18 }, font_scale);
+        let pin_team_size = scale_text(if card_compact { 15 } else { 16 }, font_scale);
 
         Self {
             viewport,
+            font_scale,
             padding,
-            countdown_size: if width < 720.0 {
-                28
-            } else if compact {
-                34
-            } else {
-                46
-            },
-            meeting_title_size: if card_compact { 19 } else { 22 },
-            card_heading_size: if card_compact { 13 } else { 14 },
-            card_body_size: if card_compact { 15 } else { 17 },
-            card_detail_size: if card_compact { 13 } else { 15 },
+            countdown_size: scale_text(
+                if width < 720.0 {
+                    28
+                } else if compact {
+                    34
+                } else {
+                    46
+                },
+                font_scale,
+            ),
+            meeting_title_size: scale_text(if card_compact { 19 } else { 22 }, font_scale),
+            card_heading_size: scale_text(if card_compact { 13 } else { 14 }, font_scale),
+            card_body_size: scale_text(if card_compact { 15 } else { 17 }, font_scale),
+            card_detail_size: scale_text(if card_compact { 13 } else { 15 }, font_scale),
             card_padding: if tight { 16.0 } else { 20.0 },
             card_flag_width: if card_compact { 42.0 } else { 50.0 },
             card_flag_height: if card_compact { 28.0 } else { 34.0 },
@@ -88,7 +125,13 @@ impl LayoutConfig {
             pin_card_stacked,
             pin_portrait_size,
             pin_name_size,
+            pin_code_size,
+            pin_team_size,
         }
+    }
+
+    pub fn text(self, base: u16) -> u16 {
+        scale_text(base, self.font_scale)
     }
 
     /// Fixed height for side-by-side race cards. Scrollable content cannot use

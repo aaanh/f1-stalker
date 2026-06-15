@@ -8,42 +8,44 @@ use crate::ui::icons::{icon, icon_label, Icon};
 use crate::ui::fonts::MONO;
 use crate::ui::scroll::driver_picker_scroll;
 use crate::ui::driver_card::driver_picker_row;
+use crate::ui::layout::LayoutConfig;
 use crate::ui::theme::{accent, border, muted, surface, text_color};
 
 pub fn driver_picker_overlay(state: &AppState) -> Element<'_, Message> {
+    let layout = LayoutConfig::from_viewport(state.viewport, state.settings.font_scale);
+
     let body: Element<Message> = match &state.drivers {
         DriversLoadState::Loading => text("Loading driver roster…")
-            .size(13)
+            .size(layout.text(15))
             .color(muted())
             .into(),
         DriversLoadState::Error { message, cached: None } => column![
-            text("Could not load drivers").size(14).color(text_color()),
-            text(message).size(12).color(muted()),
+            text("Could not load drivers").size(layout.text(16)).color(text_color()),
+            text(message).size(layout.text(14)).color(muted()),
         ]
         .spacing(6)
         .into(),
         DriversLoadState::Ready(_) | DriversLoadState::Error { cached: Some(_), .. } => {
             let Some(roster) = state.drivers_roster() else {
                 return text("Driver roster unavailable.")
-                    .size(13)
+                    .size(layout.text(15))
                     .color(muted())
                     .into();
             };
 
             if roster.is_empty() {
                 text("No drivers returned for the latest session.")
-                    .size(13)
+                    .size(layout.text(15))
                     .color(muted())
                     .into()
             } else {
-                driver_list(state, roster)
+                driver_list(state, roster, layout)
             }
         }
     };
 
     let modal_width = (state.viewport.width - 80.0).clamp(520.0, 680.0);
     let pin_count = state.pinned_drivers.len();
-    let max_pins = crate::state::MAX_PINNED_DRIVERS;
 
     let rival_pick = state.rival_pick_slot;
     let (title, subtitle) = if let Some(slot) = rival_pick {
@@ -55,7 +57,7 @@ pub fn driver_picker_overlay(state: &AppState) -> Element<'_, Message> {
         (
             "Pin drivers".into(),
             format!(
-                "{pin_count}/{max_pins} pinned · choose drivers from the latest season session."
+                "{pin_count} pinned · choose drivers from the latest season session."
             ),
         )
     };
@@ -98,11 +100,11 @@ pub fn driver_picker_overlay(state: &AppState) -> Element<'_, Message> {
             .align_y(iced::Alignment::Center)
             .width(Length::Fill),
             Space::with_height(8),
-            text(subtitle).size(12).color(muted()),
+            text(subtitle).size(layout.text(14)).color(muted()),
             Space::with_height(12),
-            search_bar(state),
+            search_bar(state, layout),
             Space::with_height(10),
-            sort_controls(state),
+            sort_controls(state, layout),
             Space::with_height(12),
             body,
         ]
@@ -131,14 +133,14 @@ pub fn driver_picker_overlay(state: &AppState) -> Element<'_, Message> {
     modal_overlay(card.into())
 }
 
-fn search_bar(state: &AppState) -> Element<'_, Message> {
+fn search_bar(state: &AppState, layout: LayoutConfig) -> Element<'_, Message> {
     container(
         row![
             icon(Icon::Search, 16.0, muted()),
             text_input("Search by name, code, or team...", &state.driver_picker.search)
                 .on_input(Message::DriverPickerSearch)
                 .padding(10)
-                .size(14)
+                .size(layout.text(15))
                 .width(Length::Fill),
         ]
         .spacing(8)
@@ -162,20 +164,20 @@ fn search_bar(state: &AppState) -> Element<'_, Message> {
     .into()
 }
 
-fn sort_controls(state: &AppState) -> Element<'_, Message> {
+fn sort_controls(state: &AppState, layout: LayoutConfig) -> Element<'_, Message> {
     let filters = &state.driver_picker;
     let grouped = filters.group_by_constructor;
 
     row![
-        sort_button("First", DriverSortField::FirstName, filters),
+        sort_button("First", DriverSortField::FirstName, filters, layout),
         Space::with_width(6),
-        sort_button("Last", DriverSortField::LastName, filters),
+        sort_button("Last", DriverSortField::LastName, filters, layout),
         Space::with_width(6),
-        sort_button("Code", DriverSortField::Code, filters),
+        sort_button("Code", DriverSortField::Code, filters, layout),
         Space::with_width(6),
-        sort_button("Team", DriverSortField::Constructor, filters),
+        sort_button("Team", DriverSortField::Constructor, filters, layout),
         Space::with_width(Length::Fill),
-        group_button(grouped),
+        group_button(grouped, layout),
     ]
     .align_y(iced::Alignment::Center)
     .width(Length::Fill)
@@ -186,6 +188,7 @@ fn sort_button(
     label: &'static str,
     field: DriverSortField,
     filters: &crate::domain::DriverPickerFilters,
+    layout: LayoutConfig,
 ) -> Element<'static, Message> {
     let active = filters.sort_field == field;
     let caption = if active {
@@ -194,21 +197,30 @@ fn sort_button(
         label.to_string()
     };
 
-    button(text(caption).size(12).font(MONO).color(if active { text_color() } else { muted() }))
+    button(
+        text(caption)
+            .size(layout.text(13))
+            .font(MONO)
+            .color(if active { text_color() } else { muted() }),
+    )
         .padding([6, 10])
         .on_press(Message::DriverPickerSortField(field))
         .style(move |_, status| sort_chip_style(active, status))
         .into()
 }
 
-fn group_button(grouped: bool) -> Element<'static, Message> {
+fn group_button(grouped: bool, layout: LayoutConfig) -> Element<'static, Message> {
     let label = if grouped {
         "Grouped by team"
     } else {
         "Group by team"
     };
 
-    button(text(label).size(12).color(if grouped { text_color() } else { muted() }))
+    button(
+        text(label)
+            .size(layout.text(13))
+            .color(if grouped { text_color() } else { muted() }),
+    )
         .padding([6, 10])
         .on_press(Message::DriverPickerToggleGroup)
         .style(move |_, status| sort_chip_style(grouped, status))
@@ -240,13 +252,17 @@ fn sort_chip_style(active: bool, status: button::Status) -> button::Style {
     }
 }
 
-fn driver_list(state: &AppState, roster: &[openf1::Driver]) -> Element<'static, Message> {
+fn driver_list(
+    state: &AppState,
+    roster: &[openf1::Driver],
+    layout: LayoutConfig,
+) -> Element<'static, Message> {
     let groups = organize_roster(roster, &state.driver_picker);
     let total_matches: usize = groups.iter().map(|group| group.drivers.len()).sum();
 
     if total_matches == 0 {
         return text("No drivers match your search.")
-            .size(13)
+            .size(layout.text(15))
             .color(muted())
             .into();
     }
@@ -257,7 +273,7 @@ fn driver_list(state: &AppState, roster: &[openf1::Driver]) -> Element<'static, 
     for group in &groups {
         if grouped {
             items.push(
-                container(text(group.team_name.clone()).size(13).color(accent()))
+                container(text(group.team_name.clone()).size(layout.text(15)).color(accent()))
                     .padding([8, 4])
                     .width(Length::Fill)
                     .into(),

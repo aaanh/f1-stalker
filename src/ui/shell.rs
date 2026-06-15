@@ -27,7 +27,7 @@ pub fn shell(state: &AppState) -> Element<'_, Message> {
         .into();
     }
 
-    let layout = LayoutConfig::from_viewport(state.viewport);
+    let layout = LayoutConfig::from_viewport(state.viewport, state.settings.font_scale);
 
     let content: Element<Message> = match state.screen {
         crate::state::Screen::Dashboard => dashboard(state, layout),

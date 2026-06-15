@@ -10,24 +10,23 @@ use crate::domain::{
     CountdownSegment, CountdownTarget, RaceTripletSlot, SeasonPhase,
 };
 use crate::state::{AppState, LoadState, Message};
+use crate::ui::championship_charts::championship_charts_section;
 use crate::ui::components::action_button_icon;
+use crate::ui::decals::{intermission_panel, signal_flag, signal_flag_sized, FlagSignal};
+use crate::ui::fonts::MONO;
 use crate::ui::icons::Icon;
+use crate::ui::layout::LayoutConfig;
 use crate::ui::pinned_drivers::pinned_drivers_section;
 use crate::ui::rival_mode::rival_section;
-use crate::ui::weather_panel::meeting_weather_panel;
-use crate::ui::championship_charts::championship_charts_section;
-use crate::ui::decals::{
-    intermission_panel, signal_flag, signal_flag_sized, FlagSignal,
-};
-use crate::ui::fonts::MONO;
-use crate::ui::layout::LayoutConfig;
 use crate::ui::scroll::scrollable_page;
+use crate::ui::standings_table::standings_section;
 use crate::ui::theme::{
-    accent, border, FLAG_BLUE, FLAG_GREEN, FLAG_YELLOW, muted, surface, text_color,
+    accent, border, muted, surface, text_color, FLAG_BLUE, FLAG_GREEN, FLAG_YELLOW,
 };
+use crate::ui::weather_panel::meeting_weather_panel;
 
 pub fn dashboard(state: &AppState, layout: LayoutConfig) -> Element<'_, Message> {
-    let footer = data_footer(state);
+    let footer = data_footer(state, layout);
 
     let body = main_body(state, layout);
 
@@ -37,9 +36,9 @@ pub fn dashboard(state: &AppState, layout: LayoutConfig) -> Element<'_, Message>
             .width(Length::Fill)
             .height(Length::Shrink),
     )
-        .padding(layout.padding)
-        .width(Length::Fill)
-        .height(Length::Shrink);
+    .padding(layout.padding)
+    .width(Length::Fill)
+    .height(Length::Shrink);
 
     scrollable_page(
         scrollable::Id::new("dashboard-scroll"),
@@ -49,14 +48,19 @@ pub fn dashboard(state: &AppState, layout: LayoutConfig) -> Element<'_, Message>
 }
 
 fn main_body(state: &AppState, layout: LayoutConfig) -> Element<'_, Message> {
-    let spacing = if layout.viewport.height < 720.0 { 12 } else { 16 };
+    let spacing = if layout.viewport.height < 720.0 {
+        12
+    } else {
+        16
+    };
 
     column![
         calendar_section(state, layout),
-        rival_section(state),
+        rival_section(state, layout),
         pinned_drivers_section(state, layout),
-        championship_narrative_banner(state),
-        championship_charts_section(state),
+        championship_narrative_banner(state, layout),
+        championship_charts_section(state, layout),
+        standings_section(state, layout),
     ]
     .spacing(spacing)
     .width(Length::Fill)
@@ -75,9 +79,12 @@ fn calendar_section(state: &AppState, layout: LayoutConfig) -> Element<'_, Messa
         .width(Length::Fill)
         .height(Length::Shrink)
         .into(),
-        LoadState::Error { message, cached: None } => column![
+        LoadState::Error {
+            message,
+            cached: None,
+        } => column![
             signal_flag(FlagSignal::Alert, "RED"),
-            text("Could not load calendar").size(18),
+            text("Could not load calendar").size(layout.text(18)),
             text(message).color(muted()),
             action_button_icon(Some(Icon::Refresh), "Retry", Message::Refresh),
         ]
@@ -85,13 +92,16 @@ fn calendar_section(state: &AppState, layout: LayoutConfig) -> Element<'_, Messa
         .width(Length::Fill)
         .height(Length::Shrink)
         .into(),
-        LoadState::Ready(_) | LoadState::Error { cached: Some(_), .. } => {
+        LoadState::Ready(_)
+        | LoadState::Error {
+            cached: Some(_), ..
+        } => {
             let mut section = column![].spacing(if layout.viewport.height < 720.0 {
                 12
             } else {
                 16
             });
-            if let Some(banner) = season_banner(state) {
+            if let Some(banner) = season_banner(state, layout) {
                 section = section.push(banner);
             }
             section = section.push(countdown_hero(state, layout));
@@ -100,7 +110,6 @@ fn calendar_section(state: &AppState, layout: LayoutConfig) -> Element<'_, Messa
         }
     }
 }
-
 
 fn countdown_hero(state: &AppState, layout: LayoutConfig) -> Element<'_, Message> {
     let Some(data) = state.calendar() else {
@@ -141,13 +150,13 @@ fn countdown_hero(state: &AppState, layout: LayoutConfig) -> Element<'_, Message
             row![
                 signal_flag(FlagSignal::Alert, "LIGHTS OUT"),
                 Space::with_width(Length::Fill),
-                text(session_label).size(13).color(muted()),
+                text(session_label).size(layout.text(13)).color(muted()),
             ]
             .align_y(iced::Alignment::Center),
             countdown_clock(timer_segments, layout),
             row![
-                text("T-").size(14).color(FLAG_YELLOW),
-                text("COUNTDOWN").size(12).color(muted()),
+                text("T-").size(layout.text(14)).color(FLAG_YELLOW),
+                text("COUNTDOWN").size(layout.text(12)).color(muted()),
             ]
             .spacing(4)
             .align_y(iced::Alignment::Center),
@@ -177,7 +186,10 @@ fn countdown_hero(state: &AppState, layout: LayoutConfig) -> Element<'_, Message
     .into()
 }
 
-fn countdown_clock(segments: Vec<CountdownSegment>, layout: LayoutConfig) -> Element<'static, Message> {
+fn countdown_clock(
+    segments: Vec<CountdownSegment>,
+    layout: LayoutConfig,
+) -> Element<'static, Message> {
     let value_size = layout.countdown_size;
     let label_size = value_size.saturating_sub(value_size / 3).max(9);
     let label_row = label_size as f32 + 4.0;
@@ -189,18 +201,14 @@ fn countdown_clock(segments: Vec<CountdownSegment>, layout: LayoutConfig) -> Ele
         if index > 0 {
             let separator = if index == segment_count - 1 { "." } else { ":" };
             clock = clock.push(
-                container(
-                    text(separator)
-                        .size(value_size)
-                        .font(MONO)
-                        .color(accent()),
-                )
-                .padding(Padding {
-                    top: 0.0,
-                    right: 4.0,
-                    bottom: label_row,
-                    left: 4.0,
-                }),
+                container(text(separator).size(value_size).font(MONO).color(accent())).padding(
+                    Padding {
+                        top: 0.0,
+                        right: 4.0,
+                        bottom: label_row,
+                        left: 4.0,
+                    },
+                ),
             );
         }
 
@@ -210,9 +218,7 @@ fn countdown_clock(segments: Vec<CountdownSegment>, layout: LayoutConfig) -> Ele
                     .size(value_size)
                     .font(MONO)
                     .color(accent()),
-                text(segment.label)
-                    .size(label_size)
-                    .color(muted()),
+                text(segment.label).size(label_size).color(muted()),
             ]
             .spacing(2)
             .align_x(iced::Alignment::Center),
@@ -301,11 +307,21 @@ fn race_card<'a>(
 
     let status = match mode {
         CardMode::Previous => None,
-        CardMode::Live => Some(signal_flag_sized(FlagSignal::Live, "live()", layout.card_detail_size)),
-        CardMode::Intermission => {
-            Some(signal_flag_sized(FlagSignal::Intermission, "SC", layout.card_detail_size))
-        }
-        CardMode::Upcoming => Some(signal_flag_sized(FlagSignal::Next, "NEXT", layout.card_detail_size)),
+        CardMode::Live => Some(signal_flag_sized(
+            FlagSignal::Live,
+            "live()",
+            layout.card_detail_size,
+        )),
+        CardMode::Intermission => Some(signal_flag_sized(
+            FlagSignal::Intermission,
+            "SC",
+            layout.card_detail_size,
+        )),
+        CardMode::Upcoming => Some(signal_flag_sized(
+            FlagSignal::Next,
+            "NEXT",
+            layout.card_detail_size,
+        )),
     };
 
     let body: Element<'a, Message> = match (meeting, mode) {
@@ -493,22 +509,18 @@ fn track_outline<'a>(
     }
 
     container(
-        container(
-            text("…")
-                .size(layout.card_detail_size)
-                .color(muted()),
-        )
-        .center_x(height)
-        .width(Length::Fill)
-        .height(Length::Fixed(height))
-        .style(|_| container::Style {
-            border: iced::Border {
-                color: border(),
-                width: 1.0,
-                radius: 6.0.into(),
-            },
-            ..Default::default()
-        }),
+        container(text("…").size(layout.card_detail_size).color(muted()))
+            .center_x(height)
+            .width(Length::Fill)
+            .height(Length::Fixed(height))
+            .style(|_| container::Style {
+                border: iced::Border {
+                    color: border(),
+                    width: 1.0,
+                    radius: 6.0.into(),
+                },
+                ..Default::default()
+            }),
     )
     .width(Length::Fill)
     .align_x(iced::Alignment::Center)
@@ -554,33 +566,27 @@ fn skeleton_cards(layout: LayoutConfig) -> Element<'static, Message> {
 }
 
 fn skeleton_card(layout: LayoutConfig) -> Element<'static, Message> {
-    container(
-        column![
-            text("…").color(muted()),
-            text("Loading").color(muted()),
-        ]
-        .spacing(8),
-    )
-    .padding(layout.card_padding)
-    .width(layout.card_width)
-    .height(layout.card_height())
-    .style(|_| container::Style {
-        background: Some(surface().into()),
-        border: iced::Border {
-            color: border(),
-            width: 1.0,
-            radius: 8.0.into(),
-        },
-        ..Default::default()
-    })
-    .into()
+    container(column![text("…").color(muted()), text("Loading").color(muted()),].spacing(8))
+        .padding(layout.card_padding)
+        .width(layout.card_width)
+        .height(layout.card_height())
+        .style(|_| container::Style {
+            background: Some(surface().into()),
+            border: iced::Border {
+                color: border(),
+                width: 1.0,
+                radius: 8.0.into(),
+            },
+            ..Default::default()
+        })
+        .into()
 }
 
 fn format_date_range(meeting: &Meeting) -> String {
     format_meeting_date_range(&meeting.date_start, &meeting.date_end)
 }
 
-fn season_banner(state: &AppState) -> Option<Element<'static, Message>> {
+fn season_banner(state: &AppState, layout: LayoutConfig) -> Option<Element<'static, Message>> {
     let phase = state.season_phase()?;
     let (title, detail) = match phase {
         SeasonPhase::PreSeason => (
@@ -601,7 +607,7 @@ fn season_banner(state: &AppState) -> Option<Element<'static, Message>> {
                     signal_flag(FlagSignal::Intermission, title),
                     Space::with_width(Length::Fill),
                 ],
-                text(detail).size(13).color(muted()),
+                text(detail).size(layout.text(13)).color(muted()),
             ]
             .spacing(8)
             .width(Length::Fill),
@@ -621,7 +627,7 @@ fn season_banner(state: &AppState) -> Option<Element<'static, Message>> {
     )
 }
 
-fn championship_narrative_banner(state: &AppState) -> Element<'_, Message> {
+fn championship_narrative_banner(state: &AppState, layout: LayoutConfig) -> Element<'_, Message> {
     if state.rival_compare_active() {
         return Space::new(Length::Shrink, Length::Fixed(0.0)).into();
     }
@@ -636,9 +642,7 @@ fn championship_narrative_banner(state: &AppState) -> Element<'_, Message> {
 
     let roster = state.drivers_roster().unwrap_or(&[]);
     let narrative = match state.season_phase() {
-        Some(SeasonPhase::SeasonComplete) => {
-            build_season_complete_narrative(&data.rounds, roster)
-        }
+        Some(SeasonPhase::SeasonComplete) => build_season_complete_narrative(&data.rounds, roster),
         _ => build_championship_narrative(&data.rounds, roster),
     };
 
@@ -648,8 +652,10 @@ fn championship_narrative_banner(state: &AppState) -> Element<'_, Message> {
 
     container(
         column![
-            text(narrative.headline).size(16).color(text_color()),
-            text(narrative.detail).size(12).color(muted()),
+            text(narrative.headline)
+                .size(layout.text(24))
+                .color(text_color()),
+            text(narrative.detail).size(layout.text(18)).color(muted()),
         ]
         .spacing(4)
         .width(Length::Fill),
@@ -668,7 +674,7 @@ fn championship_narrative_banner(state: &AppState) -> Element<'_, Message> {
     .into()
 }
 
-fn data_footer(state: &AppState) -> Element<'static, Message> {
+fn data_footer(state: &AppState, layout: LayoutConfig) -> Element<'static, Message> {
     let delay = "OpenF1 (approx. 24h delay)";
     let updated = state
         .last_fetched_at()
@@ -682,7 +688,7 @@ fn data_footer(state: &AppState) -> Element<'static, Message> {
     };
 
     text(label)
-        .size(12)
+        .size(layout.text(12))
         .color(if state.is_any_stale() {
             FLAG_YELLOW
         } else {

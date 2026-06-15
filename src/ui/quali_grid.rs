@@ -89,10 +89,10 @@ where
         rendered += 1;
         rows = rows.push(
             row![
-                text(name).size(13).color(text_color()),
+                text(name).size(layout.card_body_size).color(text_color()),
                 Space::with_width(Length::Fill),
-                text(position).size(13).color(FLAG_GREEN),
-                text(gap).size(12).color(muted()),
+                text(position).size(layout.card_body_size).color(FLAG_GREEN),
+                text(gap).size(layout.card_detail_size).color(text_color()),
             ]
             .align_y(iced::Alignment::Center)
             .width(Length::Fill),

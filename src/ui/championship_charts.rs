@@ -13,6 +13,7 @@ use crate::state::{
 use crate::ui::components::secondary_button_icon;
 use crate::ui::icons::{section_heading, subtitle_text, Icon};
 use crate::ui::fonts::MONO;
+use crate::ui::layout::{scale_px, scale_text, LayoutConfig};
 use crate::ui::theme::{accent, border, muted, surface, text_color};
 
 const CHART_HEIGHT: f32 = 280.0;
@@ -21,23 +22,26 @@ const LABEL_CHAR_WIDTH: f32 = 5.5;
 const AXIS_FONT_SIZE: f32 = 10.0;
 const ENTRY_LABEL_GAP: f32 = 10.0;
 
-pub fn championship_charts_section(state: &AppState) -> Element<'_, Message> {
+pub fn championship_charts_section(state: &AppState, layout: LayoutConfig) -> Element<'_, Message> {
+    let scale = layout.font_scale;
     let mode_tabs = row![
-        mode_button("Championship", ChartMode::Championship, state.championship_chart_mode),
+        mode_button("Championship", ChartMode::Championship, state.championship_chart_mode, scale),
         mode_button(
             "Race standing",
             ChartMode::RaceStanding,
             state.championship_chart_mode,
+            scale,
         ),
     ]
     .spacing(8);
 
     let subject_tabs = row![
-        tab_button("Drivers", ChampionshipTab::Drivers, state.championship_tab),
+        tab_button("Drivers", ChampionshipTab::Drivers, state.championship_tab, scale),
         tab_button(
             "Constructors",
             ChampionshipTab::Constructors,
             state.championship_tab,
+            scale,
         ),
     ]
     .spacing(8);
@@ -53,39 +57,46 @@ pub fn championship_charts_section(state: &AppState) -> Element<'_, Message> {
 
     let body = match &state.championship {
         ChampionshipLoadState::Loading => text("Loading championship data…")
-            .size(13)
+            .size(scale_text(13, scale))
             .color(muted())
             .into(),
         ChampionshipLoadState::Error { message, cached: None } => column![
-            text("Could not load championship data").size(14),
-            text(message).size(12).color(muted()),
+            text("Could not load championship data").size(scale_text(14, scale)),
+            text(message).size(scale_text(12, scale)).color(muted()),
             Space::with_height(8),
             secondary_button_icon(Some(Icon::Refresh), "Retry", Message::Refresh),
         ]
         .spacing(6)
         .into(),
         ChampionshipLoadState::Ready(_) | ChampionshipLoadState::Error { cached: Some(_), .. } => {
-            chart_body(state)
+            chart_body(state, scale)
         }
     };
 
-    let stale_note = championship_stale_note(state);
+    let stale_note = championship_stale_note(state, scale);
+
+    let mut header = row![
+        section_heading(
+            Icon::Trophy,
+            "Pinned drivers/constructors",
+            Some(subtitle_text(subtitle)),
+        ),
+        Space::with_width(Length::Fill),
+    ];
+    if let Some(control) = rival_compare_control(state) {
+        header = header.push(control).push(Space::with_width(8));
+    }
+    header = header.push(
+        column![mode_tabs, subject_tabs]
+            .spacing(8)
+            .align_x(iced::Alignment::End),
+    );
 
     container(
         column![
-            row![
-                section_heading(
-                    Icon::Trophy,
-                    "Championship charts",
-                    Some(subtitle_text(subtitle)),
-                ),
-                Space::with_width(Length::Fill),
-                column![mode_tabs, subject_tabs]
-                    .spacing(8)
-                    .align_x(iced::Alignment::End),
-            ]
-            .align_y(iced::Alignment::Center)
-            .width(Length::Fill),
+            header
+                .align_y(iced::Alignment::Center)
+                .width(Length::Fill),
             Space::with_height(12),
             body,
             stale_note,
@@ -108,28 +119,49 @@ pub fn championship_charts_section(state: &AppState) -> Element<'_, Message> {
     .into()
 }
 
+fn rival_compare_control(state: &AppState) -> Option<Element<'_, Message>> {
+    if state.rival_compare_active() {
+        Some(secondary_button_icon(
+            Some(Icon::Close),
+            "Stop comparing on charts",
+            Message::ExitRivalCompare,
+        ))
+    } else if state.rival_ready() {
+        Some(secondary_button_icon(
+            Some(Icon::Trophy),
+            "Compare rivals",
+            Message::ActivateRivalCompare,
+        ))
+    } else {
+        None
+    }
+}
+
 fn mode_button(
     label: &'static str,
     mode: ChartMode,
     active: ChartMode,
+    scale: f32,
 ) -> Element<'static, Message> {
-    tab_button_inner(label, mode == active, Message::ChampionshipChartModeSelected(mode))
+    tab_button_inner(label, mode == active, Message::ChampionshipChartModeSelected(mode), scale)
 }
 
 fn tab_button(
     label: &'static str,
     tab: ChampionshipTab,
     active: ChampionshipTab,
+    scale: f32,
 ) -> Element<'static, Message> {
-    tab_button_inner(label, tab == active, Message::ChampionshipTabSelected(tab))
+    tab_button_inner(label, tab == active, Message::ChampionshipTabSelected(tab), scale)
 }
 
-fn tab_button_inner(
+pub(crate) fn tab_button_inner(
     label: &'static str,
     selected: bool,
     message: Message,
+    scale: f32,
 ) -> Element<'static, Message> {
-    button(text(label).size(13))
+    button(text(label).size(scale_text(13, scale)))
         .padding([8, 14])
         .on_press(message)
         .style(move |_, status| {
@@ -174,7 +206,7 @@ fn tab_button_inner(
         .into()
 }
 
-fn championship_stale_note(state: &AppState) -> Element<'static, Message> {
+fn championship_stale_note(state: &AppState, scale: f32) -> Element<'static, Message> {
     let stale = match &state.championship {
         ChampionshipLoadState::Ready(loaded) => loaded.stale,
         ChampionshipLoadState::Error { cached: Some(loaded), .. } => loaded.stale,
@@ -183,7 +215,7 @@ fn championship_stale_note(state: &AppState) -> Element<'static, Message> {
 
     if stale {
         text("Showing cached standings · refresh to update.")
-            .size(12)
+            .size(scale_text(12, scale))
             .color(muted())
             .into()
     } else {
@@ -191,10 +223,10 @@ fn championship_stale_note(state: &AppState) -> Element<'static, Message> {
     }
 }
 
-fn chart_body(state: &AppState) -> Element<'_, Message> {
+fn chart_body(state: &AppState, scale: f32) -> Element<'_, Message> {
     let Some(data) = state.championship_data() else {
         return text("Championship data unavailable")
-            .size(13)
+            .size(scale_text(13, scale))
             .color(muted())
             .into();
     };
@@ -244,10 +276,15 @@ fn chart_body(state: &AppState) -> Element<'_, Message> {
             if state.pinned_drivers.is_empty() && !state.rival_compare_active() =>
         {
             column![
-            empty_chart_axes(charts.round_count, PositionAxis { min: 1, max: 10 }, &charts.round_labels),
+            empty_chart_axes(
+                charts.round_count,
+                PositionAxis { min: 1, max: 10 },
+                &charts.round_labels,
+                scale,
+            ),
             Space::with_height(12),
             text("Pin drivers to see their progress on this chart.")
-                .size(13)
+                .size(scale_text(13, scale))
                 .color(muted()),
         ]
         .into()
@@ -258,9 +295,30 @@ fn chart_body(state: &AppState) -> Element<'_, Message> {
             series,
             axis,
             state.chart_tooltip.as_ref(),
+            scale,
         ),
+        ChampionshipTab::Constructors
+            if state.pinned_drivers.is_empty() && !state.rival_compare_active() =>
+        {
+            column![
+                empty_chart_axes(
+                    charts.round_count.max(1),
+                    PositionAxis { min: 1, max: 10 },
+                    &charts.round_labels,
+                    scale,
+                ),
+                Space::with_height(12),
+                text("Pin drivers to see their constructors on this chart.")
+                    .size(scale_text(13, scale))
+                    .color(muted()),
+            ]
+            .into()
+        }
         ChampionshipTab::Constructors if charts.round_count == 0 => {
-            empty_message("No race data yet").into()
+            empty_message("No race data yet", scale).into()
+        }
+        ChampionshipTab::Constructors if charts.constructor_championship_series.is_empty() => {
+            empty_message("No constructor data for pinned drivers", scale).into()
         }
         ChampionshipTab::Constructors => render_chart(
             &charts,
@@ -268,6 +326,7 @@ fn chart_body(state: &AppState) -> Element<'_, Message> {
             series,
             axis,
             state.chart_tooltip.as_ref(),
+            scale,
         ),
     }
 }
@@ -278,13 +337,14 @@ fn render_chart(
     series: &[ChartSeries],
     axis: PositionAxis,
     tooltip: Option<&ChartTooltip>,
+    scale: f32,
 ) -> Element<'static, Message> {
     if charts.round_count == 0 {
-        return empty_message("No race data yet");
+        return empty_message("No race data yet", scale);
     }
 
     if series.iter().all(|entry| entry.points.is_empty()) {
-        return empty_message("No race data yet");
+        return empty_message("No race data yet", scale);
     }
 
     column![
@@ -294,9 +354,10 @@ fn render_chart(
             round_labels,
             series,
             tooltip,
+            scale,
         ),
         Space::with_height(12),
-        chart_legend(series),
+        chart_legend(series, scale),
     ]
     .into()
 }
@@ -305,15 +366,16 @@ fn empty_chart_axes(
     round_count: u32,
     axis: PositionAxis,
     round_labels: &[String],
+    scale: f32,
 ) -> Element<'static, Message> {
-    position_chart(round_count.max(1), axis, round_labels, &[], None)
+    position_chart(round_count.max(1), axis, round_labels, &[], None, scale)
 }
 
-fn empty_message(message: &'static str) -> Element<'static, Message> {
+fn empty_message(message: &'static str, scale: f32) -> Element<'static, Message> {
     column![
-        position_chart(1, PositionAxis { min: 1, max: 10 }, &[], &[], None),
+        position_chart(1, PositionAxis { min: 1, max: 10 }, &[], &[], None, scale),
         Space::with_height(12),
-        text(message).size(13).color(muted()),
+        text(message).size(scale_text(13, scale)).color(muted()),
     ]
     .into()
 }
@@ -324,6 +386,7 @@ fn position_chart(
     round_labels: &[String],
     series: &[ChartSeries],
     tooltip: Option<&ChartTooltip>,
+    scale: f32,
 ) -> Element<'static, Message> {
     Canvas::new(PositionChart {
         round_count: round_count.max(1),
@@ -331,6 +394,7 @@ fn position_chart(
         round_labels: round_labels.to_vec(),
         series: series.to_vec(),
         tooltip: tooltip.cloned(),
+        axis_font_size: scale_px(AXIS_FONT_SIZE, scale),
     })
     .width(Length::Fill)
     .height(Length::Fixed(CHART_HEIGHT))
@@ -343,6 +407,7 @@ struct PositionChart {
     round_labels: Vec<String>,
     series: Vec<ChartSeries>,
     tooltip: Option<ChartTooltip>,
+    axis_font_size: f32,
 }
 
 impl canvas::Program<Message> for PositionChart {
@@ -405,14 +470,14 @@ impl canvas::Program<Message> for PositionChart {
         let layout = ChartLayout::new(bounds.size(), self.round_count, self.axis);
 
         draw_grid(&mut frame, &layout);
-        draw_axes(&mut frame, &layout, &self.round_labels);
+        draw_axes(&mut frame, &layout, &self.round_labels, self.axis_font_size);
 
         for series in &self.series {
             draw_series(&mut frame, &layout, series);
         }
 
         if let Some(tooltip) = &self.tooltip {
-            draw_tick_hover(&mut frame, &layout, tooltip);
+            draw_tick_hover(&mut frame, &layout, tooltip, self.axis_font_size);
         }
 
         vec![frame.into_geometry()]
@@ -496,7 +561,7 @@ fn draw_grid(frame: &mut Frame, layout: &ChartLayout) {
     }
 }
 
-fn draw_axes(frame: &mut Frame, layout: &ChartLayout, round_labels: &[String]) {
+fn draw_axes(frame: &mut Frame, layout: &ChartLayout, round_labels: &[String], axis_font_size: f32) {
     let slot_width = if layout.round_count <= 1 {
         layout.plot.width
     } else {
@@ -511,7 +576,7 @@ fn draw_axes(frame: &mut Frame, layout: &ChartLayout, round_labels: &[String]) {
             content: format!("P{position}"),
             position: Point::new(layout.plot.x - 8.0, y),
             color: muted(),
-            size: iced::Pixels(10.0),
+            size: iced::Pixels(axis_font_size),
             font: MONO,
             horizontal_alignment: alignment::Horizontal::Right,
             vertical_alignment: alignment::Vertical::Center,
@@ -531,7 +596,7 @@ fn draw_axes(frame: &mut Frame, layout: &ChartLayout, round_labels: &[String]) {
             content,
             position: Point::new(anchor_x, layout.plot.y + layout.plot.height + 14.0),
             color: muted(),
-            size: iced::Pixels(AXIS_FONT_SIZE),
+            size: iced::Pixels(axis_font_size),
             font: MONO,
             horizontal_alignment: align,
             vertical_alignment: alignment::Vertical::Top,
@@ -661,7 +726,7 @@ fn nearest_round(cursor_x: f32, layout: &ChartLayout) -> Option<u32> {
     }
 }
 
-fn draw_tick_hover(frame: &mut Frame, layout: &ChartLayout, tooltip: &ChartTooltip) {
+fn draw_tick_hover(frame: &mut Frame, layout: &ChartLayout, tooltip: &ChartTooltip, axis_font_size: f32) {
     let band = Path::rectangle(
         Point::new(tooltip.x - 1.0, layout.plot.y),
         Size::new(2.0, layout.plot.height),
@@ -689,7 +754,7 @@ fn draw_tick_hover(frame: &mut Frame, layout: &ChartLayout, tooltip: &ChartToolt
                 .with_color(entry.color)
                 .with_width(2.0),
         );
-        draw_entry_label(frame, layout, tooltip.x, entry.y, entry);
+        draw_entry_label(frame, layout, tooltip.x, entry.y, entry, axis_font_size);
     }
 }
 
@@ -699,6 +764,7 @@ fn draw_entry_label(
     tick_x: f32,
     anchor_y: f32,
     entry: &ChartTickEntry,
+    axis_font_size: f32,
 ) {
     let text_width = (entry.code.len() as f32 * 7.2 + 12.0).max(28.0);
     let height = 18.0;
@@ -723,7 +789,7 @@ fn draw_entry_label(
         content: entry.code.clone(),
         position: Point::new(x + text_width / 2.0, anchor_y),
         color: text_color(),
-        size: iced::Pixels(10.0),
+        size: iced::Pixels(axis_font_size),
         font: MONO,
         horizontal_alignment: alignment::Horizontal::Center,
         vertical_alignment: alignment::Vertical::Center,
@@ -767,7 +833,7 @@ fn draw_series(frame: &mut Frame, layout: &ChartLayout, series: &ChartSeries) {
     }
 }
 
-fn chart_legend(series: &[ChartSeries]) -> Element<'static, Message> {
+fn chart_legend(series: &[ChartSeries], scale: f32) -> Element<'static, Message> {
     let mut items = row![].spacing(12).width(Length::Fill);
     for entry in series {
         let color = entry.color;
@@ -786,7 +852,7 @@ fn chart_legend(series: &[ChartSeries]) -> Element<'static, Message> {
                         },
                         ..Default::default()
                     }),
-                text(label).size(11).color(text_color()),
+                text(label).size(scale_text(11, scale)).color(text_color()),
             ]
             .spacing(6)
             .align_y(iced::Alignment::Center),

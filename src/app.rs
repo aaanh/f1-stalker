@@ -5,7 +5,7 @@ use chrono::{Datelike, Utc};
 use iced::time;
 use iced::widget::image;
 use iced::window::{self, Mode};
-use iced::{clipboard, Element, Size, Subscription, Task};
+use iced::{clipboard, keyboard, Element, Size, Subscription, Task};
 
 use openf1::Session;
 
@@ -31,6 +31,7 @@ use crate::domain::{
 use crate::platform::notifications::{notify_session_reminder, notify_standings_change};
 use crate::platform::{install_tray, poll_tray_actions, TrayAction};
 use crate::ui::theme::{self, ThemePresetId};
+use crate::ui::layout::{adjust_font_scale, clamp_font_scale, FONT_SCALE_DEFAULT};
 use crate::ui::restore_driver_picker_scroll;
 use crate::state::{
     animate_chart_tooltip, apply_chart_hover, AppState, BootStepId, ChampionshipLoadState,
@@ -508,6 +509,16 @@ impl App {
                 self.state.chart_tooltip = None;
                 Task::none()
             }
+            Message::StandingsTabSelected(tab) => {
+                self.state.settings.standings_tab = tab;
+                let _ = self.db.save_settings(&self.state.settings);
+                Task::none()
+            }
+            Message::StandingsModeSelected(mode) => {
+                self.state.settings.standings_mode = mode;
+                let _ = self.db.save_settings(&self.state.settings);
+                Task::none()
+            }
             Message::ChampionshipChartHover(hit) => {
                 apply_chart_hover(&mut self.state, hit);
                 Task::none()
@@ -618,14 +629,13 @@ impl App {
                 }
 
                 self.title_bar_drag_pending = true;
-                Task::perform(
-                    async {
-                        tokio::time::sleep(Duration::from_millis(220)).await;
-                    },
-                    |_| Message::TitleBarDrag,
-                )
+                Task::none()
             }
-            Message::TitleBarDrag => {
+            Message::TitleBarReleased => {
+                self.title_bar_drag_pending = false;
+                Task::none()
+            }
+            Message::TitleBarMoved => {
                 if self.title_bar_drag_pending {
                     self.title_bar_drag_pending = false;
                     return window_action_task(self.state.window_id, WindowAction::Drag);
@@ -639,6 +649,24 @@ impl App {
             Message::ThemeSelected(theme_id) => {
                 self.state.settings.theme_id = theme_id;
                 theme::init_palette(theme_id);
+                let _ = self.db.save_settings(&self.state.settings);
+                Task::none()
+            }
+            Message::FontScaleDelta(delta) => {
+                let next = adjust_font_scale(self.state.settings.font_scale, delta);
+                if (next - self.state.settings.font_scale).abs() < f32::EPSILON {
+                    return Task::none();
+                }
+                self.state.settings.font_scale = next;
+                let _ = self.db.save_settings(&self.state.settings);
+                Task::none()
+            }
+            Message::FontScaleReset => {
+                let reset = clamp_font_scale(FONT_SCALE_DEFAULT);
+                if (reset - self.state.settings.font_scale).abs() < f32::EPSILON {
+                    return Task::none();
+                }
+                self.state.settings.font_scale = reset;
                 let _ = self.db.save_settings(&self.state.settings);
                 Task::none()
             }
@@ -955,7 +983,24 @@ impl App {
             time::every(Duration::from_millis(TICK_MS)).map(|_| Message::Tick),
             window::resize_events().map(|(_id, size)| Message::WindowResized(size)),
             window::close_requests().map(Message::WindowCloseRequested),
+            keyboard::on_key_press(font_scale_shortcut),
         ])
+    }
+}
+
+fn font_scale_shortcut(key: keyboard::Key, modifiers: keyboard::Modifiers) -> Option<Message> {
+    if !modifiers.command() {
+        return None;
+    }
+
+    match key {
+        keyboard::Key::Character(character) => match character.as_str() {
+            "+" | "=" => Some(Message::FontScaleDelta(1)),
+            "-" => Some(Message::FontScaleDelta(-1)),
+            "0" => Some(Message::FontScaleReset),
+            _ => None,
+        },
+        _ => None,
     }
 }
 
@@ -1072,6 +1117,9 @@ fn fetch_driver_media_tasks(
                 icon_urls.insert(url);
             }
             if let Some(url) = crate::domain::team_logo_url(&driver.team_name) {
+                icon_urls.insert(url);
+            }
+            if let Some(url) = crate::domain::team_logo_display_url(&driver.team_name) {
                 icon_urls.insert(url);
             }
         }

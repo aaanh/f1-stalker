@@ -1,7 +1,7 @@
 use iced::widget::{column, container, row, text, Space};
 use iced::{Element, Length};
 
-use crate::domain::{pinned_driver_views, MAX_PINNED_DRIVERS};
+use crate::domain::pinned_driver_views;
 use crate::state::{AppState, DriversLoadState, Message};
 use crate::ui::components::secondary_button_icon;
 use crate::ui::icons::{section_heading, subtitle_text, Icon};
@@ -15,25 +15,11 @@ pub fn pinned_drivers_section(
     layout: LayoutConfig,
 ) -> Element<'_, Message> {
     let subtitle = subtitle_text(format!(
-        "{}/{} drivers pinned",
-        state.pinned_drivers.len(),
-        MAX_PINNED_DRIVERS
+        "{} drivers pinned",
+        state.pinned_drivers.len()
     ));
-    let add_control: Element<Message> = if state.can_add_pin() {
-        secondary_button_icon(Some(Icon::UserPlus), "Add driver", Message::OpenDriverPicker)
-    } else {
-        container(text("Pin limit reached").size(13).color(muted()))
-            .padding([8, 14])
-            .style(|_| container::Style {
-                border: iced::Border {
-                    color: border(),
-                    width: 1.0,
-                    radius: 6.0.into(),
-                },
-                ..Default::default()
-            })
-            .into()
-    };
+    let add_control =
+        secondary_button_icon(Some(Icon::UserPlus), "Add driver", Message::OpenDriverPicker);
 
     let header: Element<Message> = if layout.stack_header {
         column![
@@ -55,11 +41,11 @@ pub fn pinned_drivers_section(
     };
 
     let mut body = column![].spacing(12).width(Length::Fill);
-    if let Some(notice) = drivers_notice(state) {
+    if let Some(notice) = drivers_notice(state, layout) {
         body = body.push(notice);
     }
     if state.pinned_drivers.is_empty() {
-        body = body.push(empty_state());
+        body = body.push(empty_state(layout));
     } else {
         body = body.push(pinned_grid(state, layout));
         if let Some(quali) = quali_grid_section(state, layout) {
@@ -91,19 +77,19 @@ pub fn pinned_drivers_section(
     .into()
 }
 
-fn empty_state() -> Element<'static, Message> {
-    text("Pin up to 6 drivers to follow their season progress.")
-        .size(13)
+fn empty_state(layout: LayoutConfig) -> Element<'static, Message> {
+    text("Pin drivers to follow their season progress.")
+        .size(layout.text(15))
         .color(muted())
         .into()
 }
 
-fn drivers_notice(state: &AppState) -> Option<Element<'_, Message>> {
+fn drivers_notice(state: &AppState, layout: LayoutConfig) -> Option<Element<'_, Message>> {
     match &state.drivers {
         DriversLoadState::Error { message, cached: None } => Some(
             column![
-                text("Could not load driver roster").size(13),
-                text(message).size(12).color(muted()),
+                text("Could not load driver roster").size(layout.text(15)),
+                text(message).size(layout.text(14)).color(muted()),
                 secondary_button_icon(Some(Icon::Refresh), "Retry", Message::Refresh),
             ]
             .spacing(6)
@@ -111,7 +97,7 @@ fn drivers_notice(state: &AppState) -> Option<Element<'_, Message>> {
         ),
         DriversLoadState::Ready(loaded) if loaded.stale => Some(
             text("Driver roster is cached · refresh to update.")
-                .size(12)
+                .size(layout.text(14))
                 .color(muted())
                 .into(),
         ),
@@ -126,7 +112,7 @@ fn pinned_grid(state: &AppState, layout: LayoutConfig) -> Element<'_, Message> {
     if views.is_empty() && !matches!(state.drivers, DriversLoadState::Loading) {
         return column![
             text("Pinned drivers are saved, but roster data is unavailable.")
-                .size(12)
+                .size(layout.text(14))
                 .color(muted()),
             Space::with_height(8),
             secondary_button_icon(Some(Icon::Refresh), "Reload drivers", Message::Refresh),
@@ -136,7 +122,7 @@ fn pinned_grid(state: &AppState, layout: LayoutConfig) -> Element<'_, Message> {
 
     if views.is_empty() {
         return text("Loading driver details...")
-            .size(12)
+            .size(layout.text(14))
             .color(muted())
             .into();
     }

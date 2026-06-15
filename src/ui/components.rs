@@ -3,6 +3,7 @@ use iced::{Background, Color, Element, Length};
 
 use crate::state::{Message, Screen};
 use crate::ui::icons::{icon, Icon};
+use crate::ui::layout::scale_text;
 use crate::ui::theme::{accent, border, muted, surface, text_color};
 
 const GROUP_RADIUS: f32 = 6.0;
@@ -16,7 +17,7 @@ enum GroupPosition {
     Last,
 }
 
-pub fn nav_tab_group(active: Screen) -> Element<'static, Message> {
+pub fn nav_tab_group(active: Screen, font_scale: f32) -> Element<'static, Message> {
     let tabs = [
         (Icon::Dashboard, "Dashboard", Screen::Dashboard),
         (Icon::Settings, "Settings", Screen::Settings),
@@ -26,7 +27,7 @@ pub fn nav_tab_group(active: Screen) -> Element<'static, Message> {
         .into_iter()
         .enumerate()
         .map(|(index, (icon_kind, label, screen))| {
-            nav_tab_segment(icon_kind, label, screen, active, group_position(index, total))
+            nav_tab_segment(icon_kind, label, screen, active, group_position(index, total), font_scale)
         })
         .collect();
     button_group(segments)
@@ -79,7 +80,7 @@ pub fn action_button_icon(
     label: &'static str,
     message: Message,
 ) -> Element<'static, Message> {
-    button(button_label(icon_kind, label, text_color()))
+    button(button_label(icon_kind, label, text_color(), 1.0))
         .padding([10, 16])
         .on_press(message)
         .style(|_, status| standalone_button_style(status, accent(), text_color(), accent()))
@@ -95,7 +96,7 @@ pub fn secondary_button_icon(
     label: &'static str,
     message: Message,
 ) -> Element<'static, Message> {
-    button(button_label(icon_kind, label, text_color()))
+    button(button_label(icon_kind, label, text_color(), 1.0))
         .padding([8, 14])
         .on_press(message)
         .style(|_, status| {
@@ -145,16 +146,18 @@ pub fn secondary_button_icon(
 pub fn section_card<'a>(
     title: &'static str,
     body: Element<'a, Message>,
+    font_scale: f32,
 ) -> Element<'a, Message> {
-    section_card_icon(None, title, body)
+    section_card_icon(None, title, body, font_scale)
 }
 
 pub fn section_card_icon<'a>(
     icon_kind: Option<Icon>,
     title: &'static str,
     body: Element<'a, Message>,
+    font_scale: f32,
 ) -> Element<'a, Message> {
-    container(column_section(icon_kind, title, body))
+    container(column_section(icon_kind, title, body, font_scale))
         .padding(16)
         .width(Length::Fill)
         .style(|_| container::Style {
@@ -173,16 +176,18 @@ fn button_label(
     icon_kind: Option<Icon>,
     label: &'static str,
     color: Color,
+    font_scale: f32,
 ) -> Element<'static, Message> {
+    let text_size = scale_text(13, font_scale);
     match icon_kind {
         Some(kind) => row![
-            icon(kind, 14.0, color),
-            text(label).size(13).color(color),
+            icon(kind, scale_text(14, font_scale) as f32, color),
+            text(label).size(text_size).color(color),
         ]
         .spacing(6)
         .align_y(iced::Alignment::Center)
         .into(),
-        None => text(label).size(13).color(color).into(),
+        None => text(label).size(text_size).color(color).into(),
     }
 }
 
@@ -190,16 +195,20 @@ fn column_section<'a>(
     icon_kind: Option<Icon>,
     title: &'static str,
     body: Element<'a, Message>,
+    font_scale: f32,
 ) -> Element<'a, Message> {
     let title_row: Element<'a, Message> = match icon_kind {
         Some(kind) => row![
-            icon(kind, 16.0, text_color()),
-            text(title).size(15).color(text_color()),
+            icon(kind, scale_text(16, font_scale) as f32, text_color()),
+            text(title).size(scale_text(15, font_scale)).color(text_color()),
         ]
         .spacing(8)
         .align_y(iced::Alignment::Center)
         .into(),
-        None => text(title).size(15).color(text_color()).into(),
+        None => text(title)
+            .size(scale_text(15, font_scale))
+            .color(text_color())
+            .into(),
     };
 
     iced::widget::column![title_row, Space::with_height(12), body]
@@ -289,12 +298,13 @@ fn nav_tab_segment(
     screen: Screen,
     active: Screen,
     position: GroupPosition,
+    font_scale: f32,
 ) -> Element<'static, Message> {
     let selected = screen == active;
     let radius = segment_radius(position);
     let tab_color = if selected { text_color() } else { muted() };
 
-    button(button_label(Some(icon_kind), label, tab_color))
+    button(button_label(Some(icon_kind), label, tab_color, font_scale))
         .padding([8, 14])
         .on_press(Message::Navigate(screen))
         .style(move |_, status| {
@@ -312,7 +322,7 @@ fn danger_button_segment(
 ) -> Element<'static, Message> {
     let radius = segment_radius(position);
 
-    button(button_label(Some(icon_kind), label, accent()))
+    button(button_label(Some(icon_kind), label, accent(), 1.0))
         .padding([10, 16])
         .on_press(message)
         .style(move |_, status| {

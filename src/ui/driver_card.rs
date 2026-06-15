@@ -3,12 +3,12 @@ use iced::{alignment, Element, Length};
 
 use openf1::Driver;
 
-use crate::domain::{driver_display_name, driver_flag_iso2, driver_flag_url, team_colour, team_logo_url, PinDirection};
+use crate::domain::{driver_display_name, driver_flag_iso2, driver_flag_url, team_colour, team_logo_display_url, team_logo_url, PinDirection};
 use crate::state::{AppState, Message};
 use crate::ui::components::icon_button_group_sized;
 use crate::ui::icons::{icon, icon_label, Icon};
-use crate::ui::layout::LayoutConfig;
-use crate::ui::theme::{accent, border, muted, surface, text_color};
+use crate::ui::layout::{scale_px, LayoutConfig};
+use crate::ui::theme::{accent, border, surface, text_color};
 
 const HEADSHOT_SIZE: f32 = 112.0;
 const FLAG_BADGE_WIDTH: f32 = 30.0;
@@ -25,7 +25,6 @@ const BADGE_TEXT: iced::Color = iced::Color::from_rgb(0.28, 0.30, 0.36);
 const CORNER_RADIUS: f32 = 10.0;
 const BORDER_WIDTH: f32 = 3.0;
 const ROW_PADDING: [u16; 2] = [12, 16];
-const DRIVER_ACRONYM_SIZE: u16 = 12;
 const REORDER_ICON_SIZE: f32 = 22.0;
 
 pub fn driver_portrait(state: &AppState, driver: &Driver) -> Element<'static, Message> {
@@ -34,6 +33,100 @@ pub fn driver_portrait(state: &AppState, driver: &Driver) -> Element<'static, Me
 
 pub fn rival_driver_portrait(state: &AppState, driver: &Driver) -> Element<'static, Message> {
     driver_portrait_sized(state, driver, 128.0)
+}
+
+pub fn rival_fighter_portrait(state: &AppState, driver: &Driver) -> Element<'static, Message> {
+    driver_portrait_sized(state, driver, 112.0)
+}
+
+pub fn rival_fighter_team_logo(state: &AppState, driver: &Driver) -> Element<'static, Message> {
+    rival_fighter_team_logo_sized(state, driver, 112.0)
+}
+
+pub fn rival_fighter_team_logo_fill(state: &AppState, driver: &Driver) -> Element<'static, Message> {
+    const LOGO_BLOCK_HEIGHT: f32 = 112.0;
+    let colour = team_colour(&driver.team_colour);
+    let inner_height = LOGO_BLOCK_HEIGHT - BADGE_PADDING * 2.0;
+    let fallback_size = (LOGO_BLOCK_HEIGHT * 0.34).max(24.0) as u16;
+
+    let content: Element<'static, Message> = team_logo_image(state, driver)
+        .unwrap_or_else(|| team_logo_fallback(&driver.team_name, colour, fallback_size));
+
+    container(
+        container(content)
+            .width(Length::Fill)
+            .height(Length::Fixed(inner_height))
+            .align_x(alignment::Horizontal::Center)
+            .align_y(alignment::Vertical::Center),
+    )
+    .width(Length::Fill)
+    .height(Length::Fixed(LOGO_BLOCK_HEIGHT))
+    .padding(BADGE_PADDING as u16)
+    .style(|_| container::Style {
+        background: Some(BADGE_BG.into()),
+        border: iced::Border {
+            color: BADGE_BORDER,
+            width: 1.0,
+            radius: BADGE_RADIUS.into(),
+        },
+        ..Default::default()
+    })
+    .into()
+}
+
+fn team_logo_image(state: &AppState, driver: &Driver) -> Option<Element<'static, Message>> {
+    for url in [
+        team_logo_display_url(&driver.team_name),
+        team_logo_url(&driver.team_name),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        if let Some(handle) = state.flag_handle(&url) {
+            return Some(
+                image(handle)
+                    .width(Length::Shrink)
+                    .height(Length::Shrink)
+                    .content_fit(iced::ContentFit::Contain)
+                    .into(),
+            );
+        }
+    }
+
+    None
+}
+
+fn rival_fighter_team_logo_sized(state: &AppState, driver: &Driver, size: f32) -> Element<'static, Message> {
+    let inner = (size - BADGE_PADDING * 2.0).max(24.0);
+    let colour = team_colour(&driver.team_colour);
+    let fallback_size = (size * 0.32).max(18.0) as u16;
+
+    if let Some(url) = team_logo_url(&driver.team_name) {
+        if let Some(logo) = cached_image(state, &url, inner, inner) {
+            return icon_badge(logo, size, size);
+        }
+    }
+
+    icon_badge(
+        team_logo_fallback(&driver.team_name, colour, fallback_size),
+        size,
+        size,
+    )
+}
+
+fn team_logo_fallback(
+    team_name: &str,
+    colour: iced::Color,
+    font_size: u16,
+) -> Element<'static, Message> {
+    let initial = team_name
+        .chars()
+        .next()
+        .unwrap_or('?')
+        .to_uppercase()
+        .to_string();
+
+    text(initial).size(font_size).color(colour).into()
 }
 
 fn driver_portrait_sized(
@@ -165,11 +258,21 @@ pub fn driver_nationality_flag(state: &AppState, driver: &Driver) -> Element<'st
 }
 
 pub fn team_logo(state: &AppState, driver: &Driver) -> Element<'static, Message> {
+    team_logo_sized(state, driver, LOGO_BADGE_SIZE, LOGO_IMAGE_SIZE, 12)
+}
+
+fn team_logo_sized(
+    state: &AppState,
+    driver: &Driver,
+    badge_size: f32,
+    image_size: f32,
+    fallback_font_size: u16,
+) -> Element<'static, Message> {
     let colour = team_colour(&driver.team_colour);
 
     if let Some(url) = team_logo_url(&driver.team_name) {
-        if let Some(logo) = cached_image(state, &url, LOGO_IMAGE_SIZE, LOGO_IMAGE_SIZE) {
-            return icon_badge(logo, LOGO_BADGE_SIZE, LOGO_BADGE_SIZE);
+        if let Some(logo) = cached_image(state, &url, image_size, image_size) {
+            return icon_badge(logo, badge_size, badge_size);
         }
     }
 
@@ -182,47 +285,52 @@ pub fn team_logo(state: &AppState, driver: &Driver) -> Element<'static, Message>
         .to_string();
 
     icon_badge(
-        text(initial).size(12).color(colour).into(),
-        LOGO_BADGE_SIZE,
-        LOGO_BADGE_SIZE,
+        text(initial).size(fallback_font_size).color(colour).into(),
+        badge_size,
+        badge_size,
     )
 }
 
 fn driver_identity_column(
     state: &AppState,
     driver: &Driver,
-    name_size: u16,
+    layout: LayoutConfig,
     centered: bool,
 ) -> Element<'static, Message> {
     let acronym = driver.name_acronym.trim();
     let full_name = driver.full_name.clone();
     let team_name = driver.team_name.clone();
     let show_acronym = !acronym.is_empty() && !acronym.eq_ignore_ascii_case(&full_name);
+    let logo_badge = scale_px(LOGO_BADGE_SIZE, layout.font_scale);
+    let logo_image = scale_px(LOGO_IMAGE_SIZE, layout.font_scale);
+    let logo_font = layout.text(13);
 
     let mut identity = column![
         row![
             driver_nationality_flag(state, driver),
             Space::with_width(8),
-            text(full_name).size(name_size).color(text_color()),
+            text(full_name)
+                .size(layout.pin_name_size)
+                .color(text_color()),
         ]
         .spacing(0)
         .align_y(iced::Alignment::Center),
     ]
-    .spacing(4);
+    .spacing(6);
 
     if show_acronym {
         identity = identity.push(
             text(acronym.to_uppercase())
-                .size(DRIVER_ACRONYM_SIZE)
-                .color(muted()),
+                .size(layout.pin_code_size)
+                .color(text_color()),
         );
     }
 
     identity = identity.push(
         row![
-            team_logo(state, driver),
+            team_logo_sized(state, driver, logo_badge, logo_image, logo_font),
             Space::with_width(8),
-            text(team_name).size(11).color(muted()),
+            text(team_name).size(layout.pin_team_size).color(text_color()),
         ]
         .spacing(0)
         .align_y(iced::Alignment::Center),
@@ -241,14 +349,15 @@ fn driver_identity_column(
 
 pub fn driver_picker_row(state: &AppState, driver: Driver) -> Element<'static, Message> {
     let driver_number = driver.driver_number;
+    let layout = LayoutConfig::from_viewport(state.viewport, state.settings.font_scale);
 
     if let Some(slot) = state.rival_pick_slot {
         let row_content = row![
             driver_portrait(state, &driver),
             Space::with_width(12),
-            driver_identity_column(state, &driver, 18, false),
+            driver_identity_column(state, &driver, layout, false),
             Space::with_width(Length::Fill),
-            text("Select").size(12).color(accent()),
+            text("Select").size(layout.text(14)).color(accent()),
         ]
         .align_y(iced::Alignment::Center)
         .width(Length::Fill);
@@ -283,17 +392,15 @@ pub fn driver_picker_row(state: &AppState, driver: Driver) -> Element<'static, M
         .any(|pin| pin.driver_number == driver.driver_number);
 
     let action: Element<'static, Message> = if pinned {
-        row_action_button("Unpin", Message::UnpinDriver(driver_number))
-    } else if state.can_add_pin() {
-        icon_label(Icon::Pin, 13.0, accent(), "Pin", 12, accent()).into()
+        row_action_button("Unpin", Message::UnpinDriver(driver_number), layout)
     } else {
-        text("Full").size(11).color(muted()).into()
+        icon_label(Icon::Pin, 14.0, accent(), "Pin", layout.text(13), accent()).into()
     };
 
     let row_content = row![
         driver_portrait(state, &driver),
         Space::with_width(12),
-        driver_identity_column(state, &driver, 18, false),
+        driver_identity_column(state, &driver, layout, false),
         Space::with_width(8),
         container(action)
             .width(Length::Shrink)
@@ -316,7 +423,7 @@ pub fn driver_picker_row(state: &AppState, driver: Driver) -> Element<'static, M
             ..Default::default()
         });
 
-    if !pinned && state.can_add_pin() {
+    if !pinned {
         button(framed)
             .width(Length::Fill)
             .padding(0)
@@ -328,11 +435,15 @@ pub fn driver_picker_row(state: &AppState, driver: Driver) -> Element<'static, M
     }
 }
 
-fn row_action_button(label: &'static str, message: Message) -> Element<'static, Message> {
+fn row_action_button(
+    label: &'static str,
+    message: Message,
+    layout: LayoutConfig,
+) -> Element<'static, Message> {
     button(
         row![
-            icon(Icon::PinOff, 14.0, accent()),
-            text(label).size(13).color(accent()),
+            icon(Icon::PinOff, scale_px(14.0, layout.font_scale), accent()),
+            text(label).size(layout.text(14)).color(accent()),
         ]
         .spacing(6)
         .align_y(iced::Alignment::Center),
@@ -393,8 +504,7 @@ pub fn pinned_driver_card(
     let driver_number = driver.driver_number;
     let portrait =
         driver_portrait_sized(state, driver, layout.pin_portrait_size);
-    let identity =
-        driver_identity_column(state, driver, layout.pin_name_size, layout.pin_card_stacked);
+    let identity = driver_identity_column(state, driver, layout, layout.pin_card_stacked);
 
     let mut controls: Vec<(Icon, Message)> = Vec::new();
     if index > 0 {
@@ -413,10 +523,14 @@ pub fn pinned_driver_card(
     let reorder_controls: Element<'static, Message> = if controls.is_empty() {
         Space::new(Length::Shrink, Length::Fixed(0.0)).into()
     } else {
-        icon_button_group_sized(&controls, REORDER_ICON_SIZE, [10, 14])
+        icon_button_group_sized(
+            &controls,
+            scale_px(REORDER_ICON_SIZE, layout.font_scale),
+            [10, 14],
+        )
     };
 
-    let unpin = row_action_button("Unpin", Message::UnpinDriver(driver_number));
+    let unpin = row_action_button("Unpin", Message::UnpinDriver(driver_number), layout);
 
     let body: Element<'static, Message> = if layout.pin_card_stacked {
         column![

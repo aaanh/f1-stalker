@@ -6,6 +6,7 @@ use crate::state::{AppState, Message, WindowAction};
 use crate::ui::components::{icon_button_group, nav_tab_group};
 use crate::ui::fonts::MONO;
 use crate::ui::icons::{icon, Icon};
+use crate::ui::layout::scale_text;
 use crate::ui::theme::{bg, border, muted, surface};
 
 const TITLE_HEIGHT: f32 = 44.0;
@@ -34,7 +35,7 @@ pub fn title_bar(state: &AppState) -> Element<'_, Message> {
         row![
             title_bar_brand(),
             Space::with_width(16),
-            nav_tab_group(state.screen),
+            nav_tab_group(state.screen, state.settings.font_scale),
             Space::with_width(Length::Fill),
             status_chip(state),
         ]
@@ -42,7 +43,9 @@ pub fn title_bar(state: &AppState) -> Element<'_, Message> {
         .width(Length::Fill)
         .height(Length::Fill),
     )
-    .on_press(Message::TitleBarPressed);
+    .on_press(Message::TitleBarPressed)
+    .on_release(Message::TitleBarReleased)
+    .on_move(|_| Message::TitleBarMoved);
 
     mouse_area(
         container(
@@ -189,7 +192,7 @@ fn status_chip(state: &AppState) -> Element<'_, Message> {
         }
     };
 
-    container(text(label).size(11).font(MONO).color(muted()))
+    container(text(label).size(scale_text(11, state.settings.font_scale)).font(MONO).color(muted()))
         .padding([4, 8])
         .style(|_| container::Style {
             background: Some(surface().into()),

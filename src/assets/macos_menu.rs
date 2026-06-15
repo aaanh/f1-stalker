@@ -20,6 +20,8 @@ const TAG_REFRESH: NSInteger = 4;
 const TAG_FULLSCREEN: NSInteger = 5;
 const TAG_MINIMIZE: NSInteger = 6;
 const TAG_PIN_DRIVER: NSInteger = 7;
+const TAG_FONT_INCREASE: NSInteger = 8;
+const TAG_FONT_DECREASE: NSInteger = 9;
 
 static MENUS_INSTALLED: AtomicBool = AtomicBool::new(false);
 static PENDING: Mutex<Vec<Message>> = Mutex::new(Vec::new());
@@ -149,6 +151,23 @@ fn add_menus(app: &NSApplication, mtm: MainThreadMarker, handler: &MenuHandler) 
     view_menu.addItem(&NSMenuItem::separatorItem(mtm));
     view_menu.addItem(&make_item(
         mtm,
+        "Increase Text Size",
+        "=",
+        Some(NSEventModifierFlags::NSEventModifierFlagCommand),
+        TAG_FONT_INCREASE,
+        handler,
+    ));
+    view_menu.addItem(&make_item(
+        mtm,
+        "Decrease Text Size",
+        "-",
+        Some(NSEventModifierFlags::NSEventModifierFlagCommand),
+        TAG_FONT_DECREASE,
+        handler,
+    ));
+    view_menu.addItem(&NSMenuItem::separatorItem(mtm));
+    view_menu.addItem(&make_item(
+        mtm,
         "Enter Full Screen",
         "f",
         Some(
@@ -258,6 +277,8 @@ fn message_for_tag(tag: NSInteger) -> Option<Message> {
         TAG_FULLSCREEN => Some(Message::WindowAction(WindowAction::Fullscreen)),
         TAG_MINIMIZE => Some(Message::WindowAction(WindowAction::Minimize)),
         TAG_PIN_DRIVER => Some(Message::OpenDriverPicker),
+        TAG_FONT_INCREASE => Some(Message::FontScaleDelta(1)),
+        TAG_FONT_DECREASE => Some(Message::FontScaleDelta(-1)),
         _ => None,
     }
 }
