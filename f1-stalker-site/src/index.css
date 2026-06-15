@@ -132,4 +132,8 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  p a {
+    @apply underline decoration-red-500 decoration-dotted underline-offset-4 hover:text-red-500;
+  }
 }

@@ -1,8 +1,9 @@
 import { APP_VERSION, releaseDownloads } from "@/lib/releases"
 import { Logo } from "@/components/logo"
 import { ButtonGroup } from "./components/ui/button-group"
-import { Button, buttonVariants } from "./components/ui/button"
+import { buttonVariants } from "./components/ui/button"
 import React from "react"
+import { cn } from "./lib/utils"
 
 export function App() {
   return (
@@ -47,12 +48,17 @@ export function App() {
             </p>
             <ButtonGroup className="flex-wrap gap-2">
               {releaseDownloads.map((download) => (
-                <Button key={download.href} asChild>
-                  {/* {download.label.toLowerCase().indexOf("macos") > 0 && ""} */}
-                  <a href={download.href} download={download.fileName}>
-                    {download.label}
-                  </a>
-                </Button>
+                <a
+                  className={cn(
+                    buttonVariants({ variant: "default" }),
+                    "no-underline hover:no-underline"
+                  )}
+                  key={download.href}
+                  href={download.href}
+                  download={download.fileName}
+                >
+                  {download.label}
+                </a>
               ))}
             </ButtonGroup>
             <h2>Demo video</h2>
@@ -64,6 +70,53 @@ export function App() {
               className="w-full"
               title="Embedded post"
             ></iframe>
+            <h2>Features</h2>
+            <ul>
+              <li>
+                <strong>Season at a glance:</strong> previous, current, and
+                upcoming races with circuit details, session times, and a
+                countdown to the next on-track action.
+              </li>
+              <li>
+                <strong>Pinned drivers:</strong> follow as many drivers as you
+                like and track their championship progress on interactive
+                charts. Constructor standings follow the teams behind your
+                pins.
+              </li>
+              <li>
+                <strong>Standings table:</strong> full drivers and constructors
+                grids with a toggle for championship points or the latest race
+                result.
+              </li>
+              <li>
+                <strong>Rival mode:</strong> pick two drivers and compare
+                head-to-head stats, gaps, and chart focus without losing sight
+                of the wider season.
+              </li>
+              <li>
+                <strong>Race weekend detail:</strong> qualifying and sprint
+                starting grids for pinned drivers, plus weather forecasts and
+                track conditions where available.
+              </li>
+              <li>
+                <strong>Themes:</strong> dark, light, and constructor-inspired
+                color presets that apply across the whole dashboard.
+              </li>
+              <li>
+                <strong>Stay in the loop:</strong> desktop notifications for
+                pinned-driver standings changes, optional session reminders, and
+                a system tray so the app can run in the background.
+              </li>
+              <li>
+                <strong>Native and cross-platform:</strong> built in Rust with
+                Iced for macOS, Windows, and Linux. Data is cached locally in
+                SQLite so the dashboard stays usable offline.
+              </li>
+            </ul>
+            <p>
+              Race data comes from the free OpenF1 historical API (about a
+              24-hour delay). Live timing is planned for a future release.
+            </p>
             <h2>Screenshots</h2>
             {[...Array(6).keys()].map((num) => (
               <React.Fragment key={`screenshot-${num}`}>
@@ -80,11 +133,31 @@ export function App() {
               </React.Fragment>
             ))}
             <h2>Troubleshoot</h2>
+            <h3>macOS says the app cannot be opened</h3>
             <p>
-              <b>macOS Gatekeeper blocks the app from running:</b> Right-click
-              on the app, click <kbd>Open</kbd> again. If still not works, go to
-              Settings <kbd>&rarr;</kbd> Security & Privacy <kbd>&rarr;</kbd>{" "}
-              Scroll down until you see the allow this app to run button.
+              F1 Stalker is not signed with an Apple Developer certificate, so
+              macOS Gatekeeper may block the downloaded app the first time you
+              open it. This is expected for indie releases and does not mean the
+              app is broken.
+            </p>
+            <p>
+              <strong>Try this first:</strong> In Finder, right-click (or
+              Control-click) <kbd>F1 Stalker.app</kbd>, choose{" "}
+              <kbd>Open</kbd>, then confirm <kbd>Open</kbd> in the dialog. You
+              only need to do this once.
+            </p>
+            <p>
+              <strong>If that does not work:</strong> Open{" "}
+              <kbd>System Settings</kbd> <kbd>&rarr;</kbd>{" "}
+              <kbd>Privacy &amp; Security</kbd>, scroll to the{" "}
+              <kbd>Security</kbd> section, and click{" "}
+              <kbd>Open Anyway</kbd> next to the F1 Stalker message. Enter your
+              password if macOS asks for it, then open the app again.
+            </p>
+            <p>
+              Still stuck? Make sure you unzipped the download and are opening
+              the <kbd>.app</kbd> bundle, not the <kbd>.dmg</kbd> or{" "}
+              <kbd>.zip</kbd> file itself.
             </p>
             <h2>Legal and Disclaimer</h2>
             <p>
@@ -110,7 +183,28 @@ export function App() {
         </div>
       </div>
       <footer className="flex h-32 flex-col items-center justify-center gap-2">
-        <p className="text-center"><a href="https://f1stalker.aaanh.com">F1 Stalker</a> © 2026 by <a href="https://aaanh.com">Anh Nguyen</a> is licensed under <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a><img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;"/><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;"/><img src="https://mirrors.creativecommons.org/presskit/icons/sa.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;"/></p>
+        <p className="flex flex-wrap items-center gap-1 text-center">
+          <a href="https://f1stalker.aaanh.com">F1 Stalker</a> © 2026 by{" "}
+          <a href="https://aaanh.com">Anh Nguyen</a> is licensed under{" "}
+          <a href="https://creativecommons.org/licenses/by-sa/4.0/">
+            CC BY-SA 4.0
+          </a>
+          <img
+            src="https://mirrors.creativecommons.org/presskit/icons/cc.svg"
+            alt=""
+            className="ml-[0.2em] max-h-[1em] max-w-[1em]"
+          />
+          <img
+            src="https://mirrors.creativecommons.org/presskit/icons/by.svg"
+            alt=""
+            className="ml-[0.2em] max-h-[1em] max-w-[1em]"
+          />
+          <img
+            src="https://mirrors.creativecommons.org/presskit/icons/sa.svg"
+            alt=""
+            className="ml-[0.2em] max-h-[1em] max-w-[1em]"
+          />
+        </p>
         <ButtonGroup>
           <a
             className={buttonVariants({ variant: "outline" })}
