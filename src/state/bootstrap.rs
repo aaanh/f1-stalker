@@ -13,7 +13,6 @@ pub enum BootStepStatus {
     Running,
     Done,
     Failed,
-    Skipped,
 }
 
 #[derive(Debug, Clone)]
@@ -73,12 +72,6 @@ impl BootState {
         step.detail = detail.into();
     }
 
-    pub fn skip_step(&mut self, id: BootStepId, detail: impl Into<String>) {
-        let step = self.step_mut(id);
-        step.status = BootStepStatus::Skipped;
-        step.detail = detail.into();
-    }
-
     pub fn begin_media(&mut self, total: u32) {
         self.media_total = total;
         self.media_done = 0;
@@ -118,7 +111,7 @@ impl BootState {
 
         for step in &self.steps {
             total += match step.status {
-                BootStepStatus::Done | BootStepStatus::Skipped | BootStepStatus::Failed => weight,
+                BootStepStatus::Done | BootStepStatus::Failed => weight,
                 BootStepStatus::Running if step.id == BootStepId::Media => {
                     if self.media_total == 0 {
                         weight
@@ -149,7 +142,7 @@ impl BootState {
         if let Some(step) = self.steps.iter().rev().find(|step| {
             matches!(
                 step.status,
-                BootStepStatus::Done | BootStepStatus::Skipped | BootStepStatus::Failed
+                BootStepStatus::Done | BootStepStatus::Failed
             )
         }) {
             return step.detail.clone();
@@ -172,9 +165,7 @@ impl BootState {
                     .is_some_and(|step| {
                         matches!(
                             step.status,
-                            BootStepStatus::Done
-                                | BootStepStatus::Skipped
-                                | BootStepStatus::Failed
+                            BootStepStatus::Done | BootStepStatus::Failed
                         )
                     })
             });
@@ -186,7 +177,7 @@ impl BootState {
             .is_some_and(|step| {
                 matches!(
                     step.status,
-                    BootStepStatus::Done | BootStepStatus::Skipped | BootStepStatus::Failed
+                    BootStepStatus::Done | BootStepStatus::Failed
                 )
             });
 

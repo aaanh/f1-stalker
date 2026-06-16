@@ -5,23 +5,28 @@ const LOGO_TRAY: &[u8] =
     include_bytes!("../../AppIcons/Assets.xcassets/AppIcon.appiconset/64.png");
 
 static SHOW_ID: std::sync::OnceLock<tray_icon::menu::MenuId> = std::sync::OnceLock::new();
+static REFRESH_ID: std::sync::OnceLock<tray_icon::menu::MenuId> = std::sync::OnceLock::new();
 static QUIT_ID: std::sync::OnceLock<tray_icon::menu::MenuId> = std::sync::OnceLock::new();
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TrayAction {
     Show,
+    Refresh,
     Quit,
 }
 
 pub fn install() -> Result<TrayIcon, String> {
     let icon = load_icon()?;
-    let show = MenuItem::new("Show F1 Stalker", true, None);
+    let show = MenuItem::new("Open Dashboard", true, None);
+    let refresh = MenuItem::new("Refresh", true, None);
     let quit = MenuItem::new("Quit", true, None);
     let show_id = show.id().clone();
+    let refresh_id = refresh.id().clone();
     let quit_id = quit.id().clone();
 
     let menu = Menu::new();
     menu.append(&show).map_err(|error| error.to_string())?;
+    menu.append(&refresh).map_err(|error| error.to_string())?;
     menu.append(&PredefinedMenuItem::separator())
         .map_err(|error| error.to_string())?;
     menu.append(&quit).map_err(|error| error.to_string())?;
@@ -34,12 +39,16 @@ pub fn install() -> Result<TrayIcon, String> {
         .map_err(|error| error.to_string())?;
 
     let _ = SHOW_ID.set(show_id);
+    let _ = REFRESH_ID.set(refresh_id);
     let _ = QUIT_ID.set(quit_id);
     Ok(tray)
 }
 
 pub fn poll_actions() -> Vec<TrayAction> {
     let Some(show_id) = SHOW_ID.get() else {
+        return Vec::new();
+    };
+    let Some(refresh_id) = REFRESH_ID.get() else {
         return Vec::new();
     };
     let Some(quit_id) = QUIT_ID.get() else {
@@ -51,6 +60,8 @@ pub fn poll_actions() -> Vec<TrayAction> {
         .filter_map(|event| {
             if event.id == *show_id {
                 Some(TrayAction::Show)
+            } else if event.id == *refresh_id {
+                Some(TrayAction::Refresh)
             } else if event.id == *quit_id {
                 Some(TrayAction::Quit)
             } else {

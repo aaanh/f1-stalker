@@ -114,6 +114,7 @@ pub enum WeekendLoadState {
     Loading,
     Ready(LoadedWeekend),
     Error {
+        #[allow(dead_code)]
         message: String,
         cached: Option<LoadedWeekend>,
     },
@@ -151,7 +152,24 @@ pub struct AppState {
     pub title_bar_controls_hover: bool,
     pub rival_pick_slot: Option<u8>,
     pub show_first_run: bool,
+    pub first_run_step: FirstRunStep,
     pub hidden_window_mode: Option<window::Mode>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum FirstRunStep {
+    #[default]
+    Welcome,
+    Timezone,
+    Pins,
+    Done,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CustomThemeField {
+    Background,
+    Surface,
+    Accent,
 }
 
 #[derive(Debug, Clone)]
@@ -250,6 +268,14 @@ pub enum Message {
         driver_number: i64,
     },
     CompleteFirstRun,
+    FirstRunNext,
+    FirstRunBack,
+    FirstRunTimezoneSelected(String),
+    FirstRunOpenPinPicker,
+    CustomThemeFieldChanged {
+        field: CustomThemeField,
+        value: String,
+    },
     Navigate(Screen),
     OpenAbout,
     OpenDriverPicker,
@@ -354,10 +380,6 @@ impl AppState {
         self.settings.rival_compare_active && self.rival_ready()
     }
 
-    pub fn is_stale(&self) -> bool {
-        self.is_any_stale()
-    }
-
     pub fn is_any_stale(&self) -> bool {
         calendar_stale(self)
             || drivers_stale(self)
@@ -395,10 +417,6 @@ impl AppState {
 
     pub fn headshot_handle(&self, url: &str) -> Option<image::Handle> {
         self.headshot_images.get(url).cloned()
-    }
-
-    pub fn headshot_failed(&self, url: &str) -> bool {
-        self.headshot_failed.contains(url)
     }
 
 }
@@ -500,6 +518,7 @@ impl Default for AppState {
             title_bar_controls_hover: false,
             rival_pick_slot: None,
             show_first_run: false,
+            first_run_step: FirstRunStep::Welcome,
             hidden_window_mode: None,
         }
     }
