@@ -20,7 +20,8 @@ use crate::db::schema::{
     SETTING_BACKGROUND_ON_CLOSE, SETTING_FIRST_RUN_COMPLETE, SETTING_INCLUDE_TESTING,
     SETTING_NOTIFICATIONS_ENABLED,     SETTING_NOTIFY_SESSIONS, SETTING_NOTIFY_STANDINGS,
     SETTING_RIVAL_COMPARE_ACTIVE, SETTING_RIVAL_DRIVER_FIRST, SETTING_RIVAL_DRIVER_SECOND,
-    SETTING_SEASON_YEAR, SETTING_SESSION_REMINDER_MINUTES, SETTING_THEME_ID, SETTING_TIMEZONE,
+    SETTING_SEASON_YEAR, SETTING_SESSION_REMINDER_MINUTES, SETTING_THEME_ID, SETTING_CUSTOM_THEME,
+    SETTING_TIMEZONE,
     SETTING_FONT_SCALE, SETTING_STANDINGS_MODE, SETTING_STANDINGS_TAB,
     TRACK_WEATHER_CACHE_TTL_SECS,
 };
@@ -108,6 +109,11 @@ impl Database {
                 SETTING_THEME_ID => {
                     settings.theme_id = crate::ui::theme::ThemePresetId::from_key(&value)
                 }
+                SETTING_CUSTOM_THEME if !value.is_empty() => {
+                    if let Ok(theme) = serde_json::from_str(&value) {
+                        settings.custom_theme = theme;
+                    }
+                }
                 SETTING_BACKGROUND_ON_CLOSE => settings.background_on_close = parse_bool(&value),
                 SETTING_INCLUDE_TESTING => settings.include_testing = parse_bool(&value),
                 SETTING_NOTIFICATIONS_ENABLED => {
@@ -162,6 +168,10 @@ impl Database {
             settings.first_run_complete.to_string(),
         )?;
         self.set_setting(SETTING_THEME_ID, settings.theme_id.key().into())?;
+        self.set_setting(
+            SETTING_CUSTOM_THEME,
+            serde_json::to_string(&settings.custom_theme)?,
+        )?;
         self.set_setting(
             SETTING_BACKGROUND_ON_CLOSE,
             settings.background_on_close.to_string(),
@@ -582,13 +592,6 @@ impl Database {
         Ok(Some(quali_grid_from_cache(blob)))
     }
 
-    pub fn cache_entry_for_quali_grid(
-        &self,
-        meeting_key: i64,
-    ) -> Result<Option<CacheEntry>, DbError> {
-        self.cache_entry_for_key(&quali_grid_cache_key(meeting_key))
-    }
-
     fn cache_entry_for_key(&self, cache_key: &str) -> Result<Option<CacheEntry>, DbError> {
         let mut stmt = self
             .conn
@@ -750,10 +753,6 @@ impl Database {
             let _ = std::fs::remove_file(path);
         }
         Ok(())
-    }
-
-    pub fn path(&self) -> Result<PathBuf, DbError> {
-        default_db_path()
     }
 }
 

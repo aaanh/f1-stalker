@@ -1,21 +1,21 @@
+#[cfg(test)]
+mod contrast;
 mod palette;
 mod presets;
 
 pub use palette::ThemePalette;
-pub use presets::{ThemePresetId, palette_for};
+pub use presets::{ThemePresetId, palette_for, palette_for_settings};
 
 use std::sync::{OnceLock, RwLock};
 
+use crate::db::Settings;
+
 static ACTIVE: OnceLock<RwLock<ThemePalette>> = OnceLock::new();
 
-pub fn init_palette(id: ThemePresetId) {
-    let palette = palette_for(id);
+pub fn init_palette(settings: &Settings) {
+    let palette = palette_for_settings(settings);
     let lock = ACTIVE.get_or_init(|| RwLock::new(palette.clone()));
     *lock.write().expect("theme palette lock") = palette;
-}
-
-pub fn set_palette(id: ThemePresetId) {
-    init_palette(id);
 }
 
 pub fn active_palette() -> ThemePalette {
@@ -56,11 +56,6 @@ pub const FLAG_GREEN: iced::Color = iced::Color::from_rgb(0.0, 0.72, 0.25);
 pub const FLAG_YELLOW: iced::Color = iced::Color::from_rgb(0.95, 0.82, 0.0);
 pub const FLAG_RED: iced::Color = iced::Color::from_rgb(0.92, 0.12, 0.15);
 pub const FLAG_BLUE: iced::Color = iced::Color::from_rgb(0.15, 0.45, 0.95);
-pub const FLAG_BLACK: iced::Color = iced::Color::from_rgb(0.12, 0.12, 0.14);
 
 pub const CHECKER_LIGHT: iced::Color = iced::Color::from_rgb(0.92, 0.92, 0.92);
 pub const CHECKER_DARK: iced::Color = iced::Color::from_rgb(0.12, 0.12, 0.12);
-
-pub fn theme() -> iced::Theme {
-    iced_theme()
-}

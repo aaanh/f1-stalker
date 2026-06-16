@@ -1,11 +1,14 @@
 use crate::ui::theme::ThemePresetId;
 
+use crate::db::CustomTheme;
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Settings {
     pub season_year: i32,
     pub timezone: String,
     pub first_run_complete: bool,
     pub theme_id: ThemePresetId,
+    pub custom_theme: CustomTheme,
     pub background_on_close: bool,
     pub include_testing: bool,
     pub notifications_enabled: bool,
@@ -37,6 +40,7 @@ impl Default for Settings {
             timezone: crate::db::schema::DEFAULT_TIMEZONE.into(),
             first_run_complete: false,
             theme_id: ThemePresetId::Dark,
+            custom_theme: CustomTheme::default(),
             background_on_close: false,
             include_testing: false,
             notifications_enabled: true,

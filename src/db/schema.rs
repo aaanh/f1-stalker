@@ -29,6 +29,7 @@ pub const SETTING_SEASON_YEAR: &str = "season_year";
 pub const SETTING_TIMEZONE: &str = "timezone";
 pub const SETTING_FIRST_RUN_COMPLETE: &str = "first_run_complete";
 pub const SETTING_THEME_ID: &str = "theme_id";
+pub const SETTING_CUSTOM_THEME: &str = "custom_theme";
 pub const SETTING_BACKGROUND_ON_CLOSE: &str = "background_on_close";
 pub const SETTING_INCLUDE_TESTING: &str = "include_testing";
 pub const SETTING_NOTIFICATIONS_ENABLED: &str = "notifications_enabled";

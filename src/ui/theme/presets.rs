@@ -89,7 +89,19 @@ impl ThemePresetId {
             Self::Haas,
             Self::Sauber,
             Self::Rb,
+            Self::Custom,
         ]
+    }
+}
+
+pub fn palette_for_settings(settings: &crate::db::Settings) -> ThemePalette {
+    if settings.theme_id == ThemePresetId::Custom {
+        settings
+            .custom_theme
+            .to_palette()
+            .unwrap_or_else(|| palette_for(ThemePresetId::Dark))
+    } else {
+        palette_for(settings.theme_id)
     }
 }
 
@@ -132,7 +144,7 @@ pub fn palette_for(id: ThemePresetId) -> ThemePalette {
             rgb(0.18, 0.20, 0.30),
             rgb(0.93, 0.93, 0.95),
             rgb(0.55, 0.55, 0.62),
-            rgb(0.18, 0.24, 0.62),
+            rgb(0.45, 0.55, 0.98),
             rgb(0.92, 0.12, 0.15),
         ),
         ThemePresetId::Mclaren => palette(

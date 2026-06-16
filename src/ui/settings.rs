@@ -1,10 +1,10 @@
-use iced::widget::{button, column, container, row, text, Space};
+use iced::widget::{button, column, container, row, text, text_input, Space};
 use iced::widget::scrollable;
 use iced::{Element, Length};
 
 use crate::db::default_db_path;
 use crate::debug;
-use crate::state::{AppState, Message, SettingsToggle};
+use crate::state::{AppState, CustomThemeField, Message, SettingsToggle};
 use crate::ui::components::{danger_button_group, secondary_button, secondary_button_icon, section_card_icon};
 use crate::ui::icons::Icon;
 use crate::ui::fonts::MONO;
@@ -41,6 +41,7 @@ pub fn settings_page(state: &AppState, layout: LayoutConfig) -> Element<'_, Mess
             text("Theme preset").size(layout.text(12)).color(muted()),
             Space::with_height(8),
             theme_buttons(state, layout),
+            custom_theme_editor(state, layout),
             Space::with_height(12),
             font_scale_row(state, layout),
         ]
@@ -291,6 +292,58 @@ fn theme_buttons(state: &AppState, layout: LayoutConfig) -> Element<'_, Message>
         rows = rows.push(button);
     }
     container(rows).width(Length::Fill).into()
+}
+
+fn custom_theme_editor(state: &AppState, layout: LayoutConfig) -> Element<'_, Message> {
+    if state.settings.theme_id != ThemePresetId::Custom {
+        return Space::with_height(0).into();
+    }
+
+    let theme = &state.settings.custom_theme;
+    column![
+        Space::with_height(12),
+        text("Custom theme").size(layout.text(12)).color(muted()),
+        Space::with_height(8),
+        custom_theme_field(
+            "Background",
+            &theme.background,
+            CustomThemeField::Background,
+            layout,
+        ),
+        Space::with_height(8),
+        custom_theme_field("Surface", &theme.surface, CustomThemeField::Surface, layout),
+        Space::with_height(8),
+        custom_theme_field("Accent", &theme.accent, CustomThemeField::Accent, layout),
+        Space::with_height(4),
+        text("Use #RRGGBB hex colours. Changes apply immediately.")
+            .size(layout.text(11))
+            .color(muted()),
+    ]
+    .into()
+}
+
+fn custom_theme_field<'a>(
+    label: &'a str,
+    value: &'a str,
+    field: CustomThemeField,
+    layout: LayoutConfig,
+) -> Element<'a, Message> {
+    row![
+        text(label)
+            .size(layout.text(12))
+            .color(text_color())
+            .width(Length::Fixed(96.0)),
+        text_input("RRGGBB", value)
+            .on_input(move |input| Message::CustomThemeFieldChanged {
+                field,
+                value: input,
+            })
+            .padding(8)
+            .width(Length::Fill),
+    ]
+    .spacing(8)
+    .align_y(iced::Alignment::Center)
+    .into()
 }
 
 fn toggle_row(

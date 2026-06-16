@@ -3,7 +3,7 @@ use iced::{alignment, Color, Element, Length};
 
 use openf1::Driver;
 
-use crate::domain::{build_rival_narrative, driver_display_name, team_colour};
+use crate::domain::{average_quali_position, build_rival_narrative, driver_display_name, format_average_quali, team_colour};
 use crate::state::{AppState, Message};
 use crate::ui::driver_card::{rival_fighter_portrait, rival_fighter_team_logo_fill};
 use crate::ui::icons::{section_heading, Icon};
@@ -17,7 +17,6 @@ pub fn rival_section(state: &AppState, layout: LayoutConfig) -> Element<'_, Mess
     let scale = layout.font_scale;
     let (first, second) = state.rival_drivers();
     let ready = state.rival_ready();
-    let comparing = state.rival_compare_active();
 
     let header = row![section_heading(Icon::Users, "Driver rivalry", None),]
         .width(Length::Fill);
@@ -28,14 +27,12 @@ pub fn rival_section(state: &AppState, layout: LayoutConfig) -> Element<'_, Mess
                 .size(scale_text(12, scale))
                 .color(text_color()),
         )
-    } else if comparing {
+    } else {
         Some(
-            text("Charts show only these two drivers while Compare rivals is active.")
+            text("Charts show only these two drivers when Compare rivals is enabled in the chart section.")
                 .size(scale_text(12, scale))
                 .color(text_color()),
         )
-    } else {
-        None
     };
 
     let mut body = column![header].spacing(8).width(Length::Fill);
@@ -245,6 +242,10 @@ fn stats_column(stats: RivalDriverStats, scale: f32) -> Element<'static, Message
                 .size(scale_text(20, scale))
                 .color(text_color()),
             Space::with_height(6),
+            text(stats.quali_line)
+                .size(scale_text(20, scale))
+                .color(text_color()),
+            Space::with_height(6),
             text(stats.latest_race_line)
                 .size(scale_text(20, scale))
                 .color(text_color()),
@@ -299,6 +300,7 @@ fn empty_fighter_panel(slot: u8, driver_number: i64, scale: f32) -> Element<'sta
 struct RivalDriverStats {
     points_line: String,
     championship_line: String,
+    quali_line: String,
     latest_race_line: String,
 }
 
@@ -307,6 +309,7 @@ fn rival_driver_stats(state: &AppState, driver_number: i64) -> RivalDriverStats 
         return RivalDriverStats {
             points_line: "— pts".into(),
             championship_line: "Championship loading…".into(),
+            quali_line: "Quali loading…".into(),
             latest_race_line: "Latest race loading…".into(),
         };
     };
@@ -315,6 +318,7 @@ fn rival_driver_stats(state: &AppState, driver_number: i64) -> RivalDriverStats 
         return RivalDriverStats {
             points_line: "0 pts".into(),
             championship_line: "No championship data".into(),
+            quali_line: "No quali data".into(),
             latest_race_line: "No race data yet".into(),
         };
     };
@@ -339,9 +343,14 @@ fn rival_driver_stats(state: &AppState, driver_number: i64) -> RivalDriverStats 
         .map(format_latest_race)
         .unwrap_or_else(|| "No latest race result".into());
 
+    let quali_line = average_quali_position(&data.rounds, driver_number)
+        .map(format_average_quali)
+        .unwrap_or_else(|| "No quali data".into());
+
     RivalDriverStats {
         points_line,
         championship_line,
+        quali_line,
         latest_race_line,
     }
 }

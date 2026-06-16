@@ -23,22 +23,17 @@ impl Default for ThemePalette {
 
 impl ThemePalette {
     pub fn iced_theme(&self) -> iced::Theme {
-        let base = if self.id == ThemePresetId::Light {
+        let mut palette = if self.id == ThemePresetId::Light {
             iced::theme::Palette::LIGHT
         } else {
             iced::theme::Palette::DARK
         };
+        palette.background = self.bg;
+        palette.text = self.text;
+        palette.primary = self.accent;
+        palette.success = self.live;
+        palette.danger = self.accent;
 
-        iced::Theme::custom(
-            self.name.clone(),
-            iced::theme::Palette {
-                background: self.bg,
-                text: self.text,
-                primary: self.accent,
-                success: self.live,
-                danger: self.accent,
-                ..base
-            },
-        )
+        iced::Theme::custom(self.name.clone(), palette)
     }
 }
