@@ -2,6 +2,15 @@ import { useEffect, useState } from "react"
 import ReactMarkdown from "react-markdown"
 import type { Components } from "react-markdown"
 import { changelogBrowseUrl, fetchChangelog } from "@/lib/changelog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "./ui/dialog"
+import { Button } from "./ui/button"
 
 const markdownComponents: Components = {
   a: ({ href, children }) => (
@@ -40,28 +49,50 @@ export function ChangelogSection() {
   return (
     <>
       <h2>Changelog</h2>
-      <p className="text-muted-foreground not-prose text-sm">
-        Loaded from{" "}
-        <a href={changelogBrowseUrl()} target="_blank" rel="noopener noreferrer">
-          GitLab
-        </a>{" "}
-        on page load (always in sync with the repository).
-      </p>
-      {error ? (
-        <p>
-          Could not load changelog ({error}). View it on{" "}
-          <a href={changelogBrowseUrl()} target="_blank" rel="noopener noreferrer">
-            GitLab
-          </a>
-          .
-        </p>
-      ) : null}
-      {!content && !error ? <p>Loading changelog…</p> : null}
-      {content ? (
-        <div className="changelog-markdown">
-          <ReactMarkdown components={markdownComponents}>{content}</ReactMarkdown>
-        </div>
-      ) : null}
+      <Dialog>
+        <DialogTrigger asChild>
+          <Button>View changelog</Button>
+        </DialogTrigger>
+        <DialogContent className="max-w-[min(80vw,calc(100%-2rem))] sm:max-w-[min(80vw,calc(100%-2rem))]">
+          <DialogHeader>
+            <DialogTitle>F1 Stalker Changelog</DialogTitle>
+            <DialogDescription>
+              Loaded from{" "}
+              <a
+                href={changelogBrowseUrl()}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                GitLab
+              </a>{" "}
+              on page load (always in sync with the repository).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="prose max-w-none max-h-[80svh] w-full overflow-auto dark:prose-invert">
+            {error ? (
+              <p>
+                Could not load changelog ({error}). View it on{" "}
+                <a
+                  href={changelogBrowseUrl()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  GitLab
+                </a>
+                .
+              </p>
+            ) : null}
+            {!content && !error ? <p>Loading changelog…</p> : null}
+            {content ? (
+              <div className="changelog-markdown">
+                <ReactMarkdown components={markdownComponents}>
+                  {content}
+                </ReactMarkdown>
+              </div>
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
