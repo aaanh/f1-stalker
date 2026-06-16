@@ -25,18 +25,21 @@ use crate::db::{default_db_path, rebuild_database, AssetStore, Database};
 use crate::debug;
 use crate::domain::calendar_filter::next_session_reminder_at;
 use crate::domain::{
-    circuit_image_url, is_circuit_image_url, move_pin, pin_driver, prepare_circuit_image,
-    standings_signature, unpin_all, unpin_driver,
+    circuit_image_url, is_circuit_image_url, move_pin, notification_already_sent, pin_driver,
+    prepare_circuit_image, standings_signature, unpin_all, unpin_driver,
 };
 use crate::platform::notifications::{notify_session_reminder, notify_standings_change};
-use crate::platform::{install_tray, poll_tray_actions, TrayAction};
-use crate::ui::theme::{self, ThemePresetId};
+use crate::platform::{
+    install_tray, poll_tray_actions, set_dock_visible, start_server, InstanceServer, TrayAction,
+};
+use crate::ui::theme;
 use crate::ui::layout::{adjust_font_scale, clamp_font_scale, FONT_SCALE_DEFAULT};
 use crate::ui::restore_driver_picker_scroll;
 use crate::state::{
     animate_chart_tooltip, apply_chart_hover, AppState, BootStepId, ChampionshipLoadState,
-    DriversLoadState, LoadState, LoadedCalendar, LoadedChampionship, LoadedDrivers, LoadedWeekend,
-    Message, Overlay, SettingsToggle, WeekendLoadState, WindowAction,
+    CustomThemeField, DriversLoadState, FirstRunStep, LoadState, LoadedCalendar,
+    LoadedChampionship, LoadedDrivers, LoadedWeekend, Message, Overlay, SettingsToggle,
+    WeekendLoadState, WindowAction,
 };
 use crate::ui::shell;
 
@@ -70,6 +73,7 @@ struct App {
     title_bar_last_press: Option<Instant>,
     title_bar_drag_pending: bool,
     _tray: Option<tray_icon::TrayIcon>,
+    instance_server: Option<InstanceServer>,
 }
 
 impl App {
@@ -94,8 +98,11 @@ impl App {
             pinned_drivers,
             ..AppState::default()
         };
-        theme::init_palette(state.settings.theme_id);
+        theme::init_palette(&state.settings);
         state.show_first_run = !state.settings.first_run_complete;
+        if state.show_first_run {
+            state.first_run_step = FirstRunStep::Welcome;
+        }
 
         let tray = match install_tray() {
             Ok(icon) => Some(icon),
@@ -191,6 +198,7 @@ impl App {
             title_bar_last_press: None,
             title_bar_drag_pending: false,
             _tray: tray,
+            instance_server: start_server(),
         }, Task::batch(tasks))
     }
 
@@ -205,14 +213,8 @@ impl App {
 
         let signature = standings_signature(&latest.drivers);
         let key = crate::db::schema::SETTING_LAST_STANDINGS_SIGNATURE;
-        if self
-            .db
-            .load_setting(key)
-            .ok()
-            .flatten()
-            .as_deref()
-            == Some(signature.as_str())
-        {
+        let stored = self.db.load_setting(key).ok().flatten();
+        if notification_already_sent(stored.as_deref(), &signature) {
             return;
         }
 
@@ -261,14 +263,8 @@ impl App {
 
         let key = crate::db::schema::SETTING_LAST_SESSION_REMINDER;
         let signature = format!("{session_name}:{lead}");
-        if self
-            .db
-            .load_setting(key)
-            .ok()
-            .flatten()
-            .as_deref()
-            == Some(signature.as_str())
-        {
+        let stored = self.db.load_setting(key).ok().flatten();
+        if notification_already_sent(stored.as_deref(), &signature) {
             return;
         }
 
@@ -585,9 +581,17 @@ impl App {
                 self.maybe_notify_upcoming_session();
 
                 let mut follow_up = Vec::new();
+                if self
+                    .instance_server
+                    .as_ref()
+                    .is_some_and(InstanceServer::poll_focus)
+                {
+                    follow_up.push(Message::ShowFromTray);
+                }
                 for action in poll_tray_actions() {
                     follow_up.push(match action {
                         TrayAction::Show => Message::ShowFromTray,
+                        TrayAction::Refresh => Message::Refresh,
                         TrayAction::Quit => Message::QuitFromTray,
                     });
                 }
@@ -600,6 +604,7 @@ impl App {
                 }
             }
             Message::ShowFromTray => {
+                set_dock_visible(true);
                 if let Some(id) = self.state.window_id {
                     let mode = self
                         .state
@@ -648,7 +653,24 @@ impl App {
             }
             Message::ThemeSelected(theme_id) => {
                 self.state.settings.theme_id = theme_id;
-                theme::init_palette(theme_id);
+                theme::init_palette(&self.state.settings);
+                let _ = self.db.save_settings(&self.state.settings);
+                Task::none()
+            }
+            Message::CustomThemeFieldChanged { field, value } => {
+                match field {
+                    CustomThemeField::Background => {
+                        self.state.settings.custom_theme.background = value;
+                    }
+                    CustomThemeField::Surface => {
+                        self.state.settings.custom_theme.surface = value;
+                    }
+                    CustomThemeField::Accent => {
+                        self.state.settings.custom_theme.accent = value;
+                    }
+                }
+                self.state.settings.theme_id = crate::ui::theme::ThemePresetId::Custom;
+                theme::init_palette(&self.state.settings);
                 let _ = self.db.save_settings(&self.state.settings);
                 Task::none()
             }
@@ -707,8 +729,43 @@ impl App {
             Message::CompleteFirstRun => {
                 self.state.settings.first_run_complete = true;
                 self.state.show_first_run = false;
+                self.state.first_run_step = FirstRunStep::Welcome;
                 let _ = self.db.save_settings(&self.state.settings);
                 Task::none()
+            }
+            Message::FirstRunNext => {
+                self.state.first_run_step = match self.state.first_run_step {
+                    FirstRunStep::Welcome => FirstRunStep::Timezone,
+                    FirstRunStep::Timezone => FirstRunStep::Pins,
+                    FirstRunStep::Pins => FirstRunStep::Done,
+                    FirstRunStep::Done => FirstRunStep::Done,
+                };
+                Task::none()
+            }
+            Message::FirstRunBack => {
+                self.state.first_run_step = match self.state.first_run_step {
+                    FirstRunStep::Timezone => FirstRunStep::Welcome,
+                    FirstRunStep::Pins => FirstRunStep::Timezone,
+                    FirstRunStep::Done => FirstRunStep::Pins,
+                    FirstRunStep::Welcome => FirstRunStep::Welcome,
+                };
+                Task::none()
+            }
+            Message::FirstRunTimezoneSelected(timezone) => {
+                self.state.settings.timezone = timezone;
+                let _ = self.db.save_settings(&self.state.settings);
+                Task::none()
+            }
+            Message::FirstRunOpenPinPicker => {
+                self.state.rival_pick_slot = None;
+                self.state.driver_picker = crate::domain::DriverPickerFilters::default();
+                self.state.driver_picker_scroll = iced::widget::scrollable::RelativeOffset::START;
+                self.state.overlay = Overlay::DriverPicker;
+                Task::batch(vec![
+                    restore_driver_picker_scroll(
+                        iced::widget::scrollable::RelativeOffset::START,
+                    ),
+                ])
             }
             Message::WindowResized(size) => {
                 self.state.viewport = size;
@@ -732,6 +789,9 @@ impl App {
                     mode => mode,
                 };
                 self.state.hidden_window_mode = Some(restore);
+                if self.state.settings.background_on_close {
+                    set_dock_visible(false);
+                }
                 if let Some(id) = self.state.window_id {
                     window::change_mode(id, Mode::Hidden)
                 } else {
@@ -827,7 +887,9 @@ impl App {
             Message::CloseOverlay => {
                 self.state.overlay = Overlay::None;
                 self.state.rival_pick_slot = None;
-                self.state.driver_picker = crate::domain::DriverPickerFilters::default();
+                if !self.state.show_first_run {
+                    self.state.driver_picker = crate::domain::DriverPickerFilters::default();
+                }
                 Task::none()
             }
             Message::OverlayClick => Task::none(),

@@ -75,28 +75,29 @@ pub fn championship_charts_section(state: &AppState, layout: LayoutConfig) -> El
 
     let stale_note = championship_stale_note(state, scale);
 
-    let mut header = row![
+    let mut mode_row = row![].spacing(8);
+    if let Some(control) = rival_compare_control(state) {
+        mode_row = mode_row.push(control);
+    }
+    mode_row = mode_row.push(mode_tabs);
+
+    let controls = column![mode_row, subject_tabs].spacing(8);
+
+    let header = row![
         section_heading(
             Icon::Trophy,
             "Pinned drivers/constructors",
             Some(subtitle_text(subtitle)),
         ),
         Space::with_width(Length::Fill),
-    ];
-    if let Some(control) = rival_compare_control(state) {
-        header = header.push(control).push(Space::with_width(8));
-    }
-    header = header.push(
-        column![mode_tabs, subject_tabs]
-            .spacing(8)
-            .align_x(iced::Alignment::End),
-    );
+        controls,
+    ]
+    .align_y(iced::Alignment::Start)
+    .width(Length::Fill);
 
     container(
         column![
-            header
-                .align_y(iced::Alignment::Center)
-                .width(Length::Fill),
+            header,
             Space::with_height(12),
             body,
             stale_note,
