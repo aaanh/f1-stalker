@@ -15,6 +15,7 @@ use crate::domain::championship::{
     classify_race_results, completed_race_sessions, ChampionshipRoundSnapshot,
     DriverStandingSnapshot, RaceResultInput, RaceResultSnapshot, TeamStandingSnapshot,
 };
+use crate::domain::grid::{find_gp_qualifying, full_grid_slots, GridSlot};
 
 const REQUEST_DELAY: Duration = Duration::from_millis(300);
 
@@ -47,6 +48,16 @@ pub struct ChampionshipRoundBlob {
     pub teams: Vec<TeamStandingBlob>,
     #[serde(default)]
     pub race_results: Vec<RaceResultBlob>,
+    #[serde(default)]
+    pub starting_grid: Vec<GridSlotBlob>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GridSlotBlob {
+    pub driver_number: i64,
+    pub position: i64,
+    #[serde(default)]
+    pub gap_to_pole_secs: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -120,6 +131,15 @@ impl ChampionshipCacheBlob {
                             points: result.points,
                         })
                         .collect(),
+                    starting_grid: round
+                        .starting_grid
+                        .iter()
+                        .map(|slot| GridSlotBlob {
+                            driver_number: slot.driver_number,
+                            position: slot.position,
+                            gap_to_pole_secs: slot.gap_to_pole_secs,
+                        })
+                        .collect(),
                 })
                 .collect(),
             fetched_at: data.fetched_at,
@@ -167,6 +187,15 @@ pub fn championship_from_cache(blob: ChampionshipCacheBlob) -> ChampionshipData 
                         dns: result.dns,
                         dsq: result.dsq,
                         points: result.points,
+                    })
+                    .collect(),
+                starting_grid: round
+                    .starting_grid
+                    .into_iter()
+                    .map(|slot| GridSlot {
+                        driver_number: slot.driver_number,
+                        position: slot.position,
+                        gap_to_pole_secs: slot.gap_to_pole_secs,
                     })
                     .collect(),
             })
@@ -223,6 +252,7 @@ pub async fn fetch_season_championship(
                             drivers: cached.drivers.clone(),
                             teams: cached.teams.clone(),
                             race_results,
+                            starting_grid: cached.starting_grid.clone(),
                         });
                         continue;
                     }
@@ -250,7 +280,7 @@ pub async fn fetch_season_championship(
             tokio::time::sleep(REQUEST_DELAY).await;
         }
 
-        match fetch_round(&client, *round, session).await {
+        match fetch_round(&client, *round, session, sessions).await {
             Ok(snapshot) => {
                 fetched_any = true;
                 rounds.push(snapshot);
@@ -300,6 +330,7 @@ fn snapshot_with_round(round: u32, cached: &ChampionshipRoundSnapshot) -> Champi
         drivers: cached.drivers.clone(),
         teams: cached.teams.clone(),
         race_results: cached.race_results.clone(),
+        starting_grid: cached.starting_grid.clone(),
     }
 }
 
@@ -354,6 +385,7 @@ async fn fetch_round(
     client: &OpenF1Client,
     round: u32,
     session: &Session,
+    sessions: &[Session],
 ) -> Result<ChampionshipRoundSnapshot, FetchError> {
     let drivers = client
         .championship_drivers()
@@ -378,6 +410,7 @@ async fn fetch_round(
             ));
             Vec::new()
         });
+    let starting_grid = fetch_meeting_starting_grid(client, sessions, session.meeting_key).await;
 
     Ok(ChampionshipRoundSnapshot {
         round,
@@ -386,7 +419,34 @@ async fn fetch_round(
         drivers: map_driver_standings(drivers),
         teams: map_team_standings(teams),
         race_results: map_race_results(&results),
+        starting_grid,
     })
+}
+
+async fn fetch_meeting_starting_grid(
+    client: &OpenF1Client,
+    sessions: &[Session],
+    meeting_key: i64,
+) -> Vec<GridSlot> {
+    let Some(quali) = find_gp_qualifying(sessions, meeting_key) else {
+        return Vec::new();
+    };
+
+    match client
+        .starting_grid()
+        .list(openf1::StartingGridListParams {
+            session_key: Some(OpenF1Key::Id(quali.session_key)),
+        })
+        .await
+    {
+        Ok(grid) => full_grid_slots(&grid),
+        Err(error) => {
+            debug::warn(format!(
+                "starting_grid unavailable for meeting {meeting_key}: {error}"
+            ));
+            Vec::new()
+        }
+    }
 }
 
 fn map_race_results(results: &[SessionResult]) -> Vec<RaceResultSnapshot> {
@@ -480,6 +540,7 @@ mod tests {
                     dsq: false,
                     points: 25,
                 }],
+                starting_grid: vec![],
             }],
             fetched_at: Utc::now(),
         };

@@ -47,6 +47,10 @@ pub struct LayoutConfig {
     pub pin_name_size: u16,
     pub pin_code_size: u16,
     pub pin_team_size: u16,
+    pub standings_position_size: u16,
+    pub standings_arrow_size: f32,
+    pub standings_arrow_column_width: f32,
+    pub standings_position_column_width: f32,
 }
 
 impl LayoutConfig {
@@ -91,6 +95,15 @@ impl LayoutConfig {
         );
         let pin_code_size = scale_text(if card_compact { 16 } else { 18 }, font_scale);
         let pin_team_size = scale_text(if card_compact { 15 } else { 16 }, font_scale);
+        let standings_position_size = scale_text(if card_compact { 22 } else { 24 }, font_scale);
+        let standings_arrow_size = scale_px(if card_compact { 20.0 } else { 22.0 }, font_scale);
+        let standings_arrow_column_width =
+            scale_px(standings_arrow_size * 2.0 + 12.0, font_scale);
+        // Three monospace glyphs (DSQ/DNF/DNS) at standings position size.
+        let standings_position_column_width = scale_px(
+            standings_position_size as f32 * 0.65 * 3.0 + 10.0,
+            font_scale,
+        );
 
         Self {
             viewport,
@@ -127,11 +140,19 @@ impl LayoutConfig {
             pin_name_size,
             pin_code_size,
             pin_team_size,
+            standings_position_size,
+            standings_arrow_size,
+            standings_arrow_column_width,
+            standings_position_column_width,
         }
     }
 
     pub fn text(self, base: u16) -> u16 {
         scale_text(base, self.font_scale)
+    }
+
+    pub fn standings_rank_block_width(self) -> f32 {
+        self.standings_arrow_column_width + self.standings_position_column_width
     }
 
     /// Fixed height for side-by-side race cards. Scrollable content cannot use

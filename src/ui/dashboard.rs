@@ -6,13 +6,14 @@ use openf1::Meeting;
 use crate::domain::{
     build_championship_narrative, build_season_complete_narrative, circuit_image_url,
     countdown_segments, countdown_segments_pending, countdown_segments_zero,
-    format_fetched_at_long, format_meeting_date_range, format_session_start, season_phase,
-    CountdownSegment, CountdownTarget, RaceTripletSlot, SeasonPhase,
+    format_fetched_at_long, format_meeting_date_range, format_session_start, podium_for_meeting,
+    season_phase, CountdownSegment, CountdownTarget, PodiumEntry, RaceTripletSlot, SeasonPhase,
 };
 use crate::state::{AppState, LoadState, Message};
 use crate::ui::championship_charts::championship_charts_section;
 use crate::ui::components::action_button_icon;
 use crate::ui::decals::{intermission_panel, signal_flag, signal_flag_sized, FlagSignal};
+use crate::ui::driver_card::driver_portrait_sized;
 use crate::ui::fonts::MONO;
 use crate::ui::icons::Icon;
 use crate::ui::layout::LayoutConfig;
@@ -333,7 +334,27 @@ fn race_card<'a>(
             .spacing(10),
             layout,
         ),
-        (Some(m), _) => card_body(
+        (Some(m), CardMode::Previous | CardMode::Live) => card_body(
+            column![
+                card_header(heading, status, layout),
+                meeting_header(state, m, layout),
+                text(&m.circuit_short_name)
+                    .size(layout.card_body_size)
+                    .color(muted()),
+                text(format!("{}, {}", m.location, m.country_name))
+                    .size(layout.card_detail_size)
+                    .color(muted()),
+                text(format_date_range(m))
+                    .size(layout.card_detail_size)
+                    .color(muted()),
+                podium_panel(state, m.meeting_key, layout),
+                meeting_weather_panel(state, m, layout),
+                track_outline(state, m, layout),
+            ]
+            .spacing(8),
+            layout,
+        ),
+        (Some(m), CardMode::Upcoming) => card_body(
             column![
                 card_header(heading, status, layout),
                 meeting_header(state, m, layout),
@@ -586,6 +607,82 @@ fn format_date_range(meeting: &Meeting) -> String {
     format_meeting_date_range(&meeting.date_start, &meeting.date_end)
 }
 
+fn podium_panel(state: &AppState, meeting_key: i64, layout: LayoutConfig) -> Element<'_, Message> {
+    let Some(data) = state.championship_data() else {
+        return Space::new(Length::Shrink, Length::Fixed(0.0)).into();
+    };
+
+    let roster = state.drivers_roster().unwrap_or(&[]);
+    let podium = podium_for_meeting(&data.rounds, meeting_key, roster);
+
+    if podium.is_empty() {
+        return Space::new(Length::Shrink, Length::Fixed(0.0)).into();
+    }
+
+    let cards: Vec<Element<'_, Message>> = podium
+        .iter()
+        .filter_map(|entry| {
+            roster
+                .iter()
+                .find(|driver| driver.driver_number == entry.driver_number)
+                .map(|driver| podium_driver_card(state, entry, driver, layout))
+        })
+        .collect();
+
+    if cards.is_empty() {
+        return Space::new(Length::Shrink, Length::Fixed(0.0)).into();
+    }
+
+    column![
+        text("Podium").size(layout.card_detail_size).color(muted()),
+        row(cards)
+            .spacing(8)
+            .width(Length::Fill)
+            .align_y(iced::Alignment::Start),
+    ]
+    .spacing(6)
+    .width(Length::Fill)
+    .into()
+}
+
+fn podium_driver_card<'a>(
+    state: &'a AppState,
+    entry: &PodiumEntry,
+    driver: &openf1::Driver,
+    layout: LayoutConfig,
+) -> Element<'a, Message> {
+    let portrait_size = (56.0 * layout.font_scale).max(44.0);
+    let position_label = format!("P{}", entry.position);
+
+    container(
+        column![
+            driver_portrait_sized(state, driver, portrait_size),
+            text(position_label)
+                .size(layout.card_detail_size)
+                .font(MONO)
+                .color(entry.accent),
+            text(entry.code.clone())
+                .size(layout.card_detail_size)
+                .color(text_color()),
+        ]
+        .spacing(4)
+        .align_x(iced::Alignment::Center)
+        .width(Length::Fill),
+    )
+    .padding([8, 6])
+    .width(Length::FillPortion(1))
+    .style(|_| container::Style {
+        background: Some(surface().into()),
+        border: iced::Border {
+            color: border(),
+            width: 1.0,
+            radius: 8.0.into(),
+        },
+        ..Default::default()
+    })
+    .into()
+}
+
 fn season_banner(state: &AppState, layout: LayoutConfig) -> Option<Element<'static, Message>> {
     let phase = state.season_phase()?;
     let (title, detail) = match phase {
@@ -628,10 +725,6 @@ fn season_banner(state: &AppState, layout: LayoutConfig) -> Option<Element<'stat
 }
 
 fn championship_narrative_banner(state: &AppState, layout: LayoutConfig) -> Element<'_, Message> {
-    if state.rival_compare_active() {
-        return Space::new(Length::Shrink, Length::Fixed(0.0)).into();
-    }
-
     let Some(data) = state.championship_data() else {
         return Space::new(Length::Shrink, Length::Fixed(0.0)).into();
     };

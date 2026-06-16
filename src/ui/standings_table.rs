@@ -1,13 +1,16 @@
 use iced::widget::{column, container, row, text, Space};
-use iced::{Element, Length};
+use iced::{alignment, Element, Length};
 
-use crate::domain::{build_standings, ChampionshipTab, ChartMode, StandingRow};
+use crate::domain::{
+    build_standings, ChampionshipTab, ChartMode, PositionChange, StandingRow,
+};
 use crate::state::{AppState, ChampionshipLoadState, Message};
 use crate::ui::championship_charts::tab_button_inner;
 use crate::ui::components::secondary_button_icon;
-use crate::ui::icons::{section_heading, subtitle_text, Icon};
+use crate::ui::fonts::MONO;
+use crate::ui::icons::{icon, section_heading, subtitle_text, Icon};
 use crate::ui::layout::{scale_text, LayoutConfig};
-use crate::ui::theme::{border, muted, surface, text_color};
+use crate::ui::theme::{accent, border, muted, surface, text_color};
 
 pub fn standings_section(state: &AppState, layout: LayoutConfig) -> Element<'_, Message> {
     let scale = layout.font_scale;
@@ -28,7 +31,7 @@ pub fn standings_section(state: &AppState, layout: LayoutConfig) -> Element<'_, 
 
     let subtitle = match mode {
         ChartMode::Championship => "Full championship standings after the latest Grand Prix",
-        ChartMode::RaceStanding => "Latest race results for the full grid",
+        ChartMode::RaceStanding => "Latest race results with starting grid positions",
     };
 
     let body = match &state.championship {
@@ -108,34 +111,42 @@ fn standings_body(
             .into();
     }
 
-    standings_grid(rows, layout)
+    standings_grid(rows, layout, mode)
 }
 
-fn standings_grid(rows: Vec<StandingRow>, layout: LayoutConfig) -> Element<'static, Message> {
-    let columns = standings_columns(layout.viewport.width);
-    let cards: Vec<Element<'static, Message>> = rows
-        .into_iter()
-        .map(|row| standing_card(row, layout))
-        .collect();
+fn standings_grid(
+    rows: Vec<StandingRow>,
+    layout: LayoutConfig,
+    mode: ChartMode,
+) -> Element<'static, Message> {
+    let columns = layout.pinned_grid_columns.max(1);
 
     if columns == 1 {
-        return column(cards).spacing(8).width(Length::Fill).into();
+        return column(
+            rows.into_iter()
+                .map(|row| standing_card(row, layout, mode))
+                .collect::<Vec<_>>(),
+        )
+        .spacing(8)
+        .width(Length::Fill)
+        .into();
     }
 
+    let row_count = rows.len().div_ceil(columns);
     let mut grid = column![].spacing(8).width(Length::Fill);
-    let mut iter = cards.into_iter();
 
-    loop {
+    for row_idx in 0..row_count {
         let mut cells: Vec<Element<'static, Message>> = Vec::new();
-        for _ in 0..columns {
-            match iter.next() {
-                Some(card) => cells.push(
-                    container(card)
+
+        for col_idx in 0..columns {
+            let index = col_idx * row_count + row_idx;
+            if index < rows.len() {
+                cells.push(
+                    container(standing_card(rows[index].clone(), layout, mode))
                         .width(Length::FillPortion(1))
                         .height(Length::Shrink)
                         .into(),
-                ),
-                None => break,
+                );
             }
         }
 
@@ -158,28 +169,42 @@ fn standings_grid(rows: Vec<StandingRow>, layout: LayoutConfig) -> Element<'stat
     grid.into()
 }
 
-fn standings_columns(viewport_width: f32) -> usize {
-    if viewport_width < 720.0 {
-        1
-    } else {
-        2
-    }
-}
+fn standing_card(
+    row: StandingRow,
+    layout: LayoutConfig,
+    mode: ChartMode,
+) -> Element<'static, Message> {
+    let StandingRow {
+        position_label,
+        label,
+        code,
+        accent: accent_colour,
+        grid_position,
+        position_change,
+        ..
+    } = row;
 
-fn standing_card(row: StandingRow, layout: LayoutConfig) -> Element<'static, Message> {
-    let accent = row.accent;
+    let mut details = column![
+        text(label).size(layout.text(15)).color(text_color()),
+        text(code).size(layout.text(14)).color(accent_colour),
+    ]
+    .spacing(2)
+    .width(Length::Fill);
+
+    if mode == ChartMode::RaceStanding {
+        if let Some(grid_position) = grid_position {
+            details = details.push(
+                text(format!("Grid P{grid_position}"))
+                    .size(layout.text(12))
+                    .color(muted()),
+            );
+        }
+    }
 
     container(
         row![
-            container(text(row.position_label).size(layout.text(18)).font(crate::ui::fonts::MONO).color(text_color()))
-                .width(Length::Fixed(40.0))
-                .align_x(iced::alignment::Horizontal::Center),
-            column![
-                text(row.label).size(layout.text(15)).color(text_color()),
-                text(row.code).size(layout.text(14)).color(accent),
-            ]
-            .spacing(2)
-            .width(Length::Fill),
+            rank_block(position_label, position_change, layout),
+            details,
         ]
         .spacing(10)
         .align_y(iced::Alignment::Center)
@@ -187,7 +212,7 @@ fn standing_card(row: StandingRow, layout: LayoutConfig) -> Element<'static, Mes
     )
     .padding([10, 12])
     .width(Length::Fill)
-    .style(move |_| container::Style {
+    .style(|_| container::Style {
         background: Some(surface().into()),
         border: iced::Border {
             color: border(),
@@ -196,6 +221,47 @@ fn standing_card(row: StandingRow, layout: LayoutConfig) -> Element<'static, Mes
         },
         ..Default::default()
     })
+    .into()
+}
+
+fn rank_block(
+    position_label: String,
+    position_change: Option<PositionChange>,
+    layout: LayoutConfig,
+) -> Element<'static, Message> {
+    let (up_color, down_color) = match position_change {
+        Some(PositionChange::Improved) => (accent(), muted()),
+        Some(PositionChange::Worsened) => (muted(), accent()),
+        Some(PositionChange::Unchanged) | None => (muted(), muted()),
+    };
+
+    let arrow_size = layout.standings_arrow_size;
+
+    container(
+        row![
+            container(
+                row![
+                    icon(Icon::ChevronUp, arrow_size, up_color),
+                    icon(Icon::ChevronDown, arrow_size, down_color),
+                ]
+                .spacing(4)
+                .align_y(iced::Alignment::Center),
+            )
+            .width(Length::Fixed(layout.standings_arrow_column_width))
+            .align_x(alignment::Horizontal::Center),
+            container(
+                text(position_label)
+                    .size(layout.standings_position_size)
+                    .font(MONO)
+                    .color(text_color()),
+            )
+            .width(Length::Fixed(layout.standings_position_column_width))
+            .align_x(alignment::Horizontal::Right),
+        ]
+        .align_y(iced::Alignment::Center),
+    )
+    .width(Length::Fixed(layout.standings_rank_block_width()))
+    .align_x(alignment::Horizontal::Left)
     .into()
 }
 

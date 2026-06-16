@@ -86,6 +86,36 @@ pub fn sprint_grid_visibility(
     }
 }
 
+pub fn full_grid_slots(grid: &[StartingGrid]) -> Vec<GridSlot> {
+    if grid.is_empty() {
+        return Vec::new();
+    }
+
+    let pole_lap = grid
+        .iter()
+        .find(|entry| entry.position == 1)
+        .and_then(|entry| entry.lap_duration);
+
+    let mut slots: Vec<GridSlot> = grid
+        .iter()
+        .map(|entry| {
+            let gap_to_pole_secs = match (pole_lap, entry.lap_duration) {
+                (Some(pole), Some(lap)) if entry.position != 1 => Some((lap - pole).max(0.0)),
+                _ => None,
+            };
+
+            GridSlot {
+                driver_number: entry.driver_number,
+                position: entry.position,
+                gap_to_pole_secs,
+            }
+        })
+        .collect();
+
+    slots.sort_by_key(|slot| slot.position);
+    slots
+}
+
 pub fn build_grid_slots(grid: &[StartingGrid], pinned_numbers: &[i64]) -> Vec<GridSlot> {
     if grid.is_empty() || pinned_numbers.is_empty() {
         return Vec::new();
