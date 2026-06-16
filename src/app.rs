@@ -9,17 +9,16 @@ use iced::{clipboard, keyboard, Element, Size, Subscription, Task};
 
 use openf1::Session;
 
-use crate::data::{
-    assemble_weekend_from_cache, cache_is_fresh, championship_needs_refresh,
-    fetch_season_calendar, fetch_season_championship, fetch_season_drivers,
-    fetch_weekend_details, meetings_for_weather, quali_grid_needs_refresh,
-    weekend_weather_needs_refresh, CalendarCacheBlob, CalendarData, ChampionshipCacheBlob,
-    ChampionshipData, DriversCacheBlob, DriversData, ForecastData, QualiGridCacheBlob,
-    QualiGridData, TrackWeatherCacheBlob, TrackWeatherData, WeekendDetailData,
-    WeekendFetchInput,
-};
 use crate::assets::{
     apply_platform_branding, drain_menu_messages, fonts, window_icon, APP_DISPLAY_NAME,
+};
+use crate::data::{
+    assemble_weekend_from_cache, cache_is_fresh, championship_needs_refresh, fetch_season_calendar,
+    fetch_season_championship, fetch_season_drivers, fetch_weekend_details, meetings_for_weather,
+    quali_grid_needs_refresh, weekend_weather_needs_refresh, CalendarCacheBlob, CalendarData,
+    ChampionshipCacheBlob, ChampionshipData, DriversCacheBlob, DriversData, ForecastData,
+    QualiGridCacheBlob, QualiGridData, TrackWeatherCacheBlob, TrackWeatherData, WeekendDetailData,
+    WeekendFetchInput,
 };
 use crate::db::{default_db_path, rebuild_database, AssetStore, Database};
 use crate::debug;
@@ -32,16 +31,16 @@ use crate::platform::notifications::{notify_session_reminder, notify_standings_c
 use crate::platform::{
     install_tray, poll_tray_actions, set_dock_visible, start_server, InstanceServer, TrayAction,
 };
-use crate::ui::theme;
-use crate::ui::layout::{adjust_font_scale, clamp_font_scale, FONT_SCALE_DEFAULT};
-use crate::ui::restore_driver_picker_scroll;
 use crate::state::{
     animate_chart_tooltip, apply_chart_hover, AppState, BootStepId, ChampionshipLoadState,
     CustomThemeField, DriversLoadState, FirstRunStep, LoadState, LoadedCalendar,
     LoadedChampionship, LoadedDrivers, LoadedWeekend, Message, Overlay, SettingsToggle,
     WeekendLoadState, WindowAction,
 };
+use crate::ui::layout::{adjust_font_scale, clamp_font_scale, FONT_SCALE_DEFAULT};
+use crate::ui::restore_driver_picker_scroll;
 use crate::ui::shell;
+use crate::ui::theme;
 
 const TICK_MS: u64 = 50;
 
@@ -56,14 +55,14 @@ pub fn run() -> iced::Result {
     }
 
     app.window(iced::window::Settings {
-            size: Size::new(1100.0, 780.0),
-            min_size: Some(Size::new(800.0, 600.0)),
-            decorations: false,
-            icon: Some(window_icon()),
-            exit_on_close_request: false,
-            ..Default::default()
-        })
-        .run_with(App::boot)
+        size: Size::new(1100.0, 780.0),
+        min_size: Some(Size::new(800.0, 600.0)),
+        decorations: false,
+        icon: Some(window_icon()),
+        exit_on_close_request: false,
+        ..Default::default()
+    })
+    .run_with(App::boot)
 }
 
 struct App {
@@ -191,15 +190,18 @@ impl App {
         finalize_boot_media_step(&mut state);
         state.boot.try_finish();
 
-        (Self {
-            state,
-            db,
-            assets,
-            title_bar_last_press: None,
-            title_bar_drag_pending: false,
-            _tray: tray,
-            instance_server: start_server(),
-        }, Task::batch(tasks))
+        (
+            Self {
+                state,
+                db,
+                assets,
+                title_bar_last_press: None,
+                title_bar_drag_pending: false,
+                _tray: tray,
+                instance_server: start_server(),
+            },
+            Task::batch(tasks),
+        )
     }
 
     fn maybe_notify_standings(&self, data: &ChampionshipData) {
@@ -226,8 +228,7 @@ impl App {
                 .iter()
                 .find(|row| row.driver_number == pin.driver_number)
             {
-                if let Some(driver) = roster.iter().find(|d| d.driver_number == pin.driver_number)
-                {
+                if let Some(driver) = roster.iter().find(|d| d.driver_number == pin.driver_number) {
                     notify_standings_change(
                         &crate::domain::driver_display_name(driver),
                         entry.position,
@@ -249,11 +250,9 @@ impl App {
 
         let now = Utc::now();
         let lead = self.state.settings.session_reminder_minutes;
-        let Some((remind_at, session_name)) = next_session_reminder_at(
-            &calendar.sessions,
-            now,
-            lead,
-        ) else {
+        let Some((remind_at, session_name)) =
+            next_session_reminder_at(&calendar.sessions, now, lead)
+        else {
             return;
         };
 
@@ -284,19 +283,17 @@ impl App {
                     .state
                     .calendar()
                     .map(|calendar| calendar.sessions.clone());
-                let mut tasks = vec![
-                    fetch_calendar_task(season),
-                    fetch_drivers_task(season),
-                ];
+                let mut tasks = vec![fetch_calendar_task(season), fetch_drivers_task(season)];
                 if let Some(sessions) = championship_sessions {
                     let cached = self.db.championship_from_cache(season).ok().flatten();
                     if self.state.championship_data().is_none() {
                         self.state.championship = ChampionshipLoadState::Loading;
                     } else if let ChampionshipLoadState::Ready(loaded) = &self.state.championship {
-                        self.state.championship = ChampionshipLoadState::Ready(LoadedChampionship {
-                            data: loaded.data.clone(),
-                            stale: true,
-                        });
+                        self.state.championship =
+                            ChampionshipLoadState::Ready(LoadedChampionship {
+                                data: loaded.data.clone(),
+                                stale: true,
+                            });
                     }
                     tasks.push(fetch_championship_task(season, sessions, cached));
                     self.state.championship_refreshing = true;
@@ -318,10 +315,7 @@ impl App {
                         let blob = CalendarCacheBlob::from_calendar(&data);
                         let _ = self.db.save_calendar_cache(&blob);
                         data.apply_preferences(self.state.settings.include_testing);
-                        self.state.load = LoadState::Ready(LoadedCalendar {
-                            data,
-                            stale: false,
-                        });
+                        self.state.load = LoadState::Ready(LoadedCalendar { data, stale: false });
                         sync_boot_calendar_done(&mut self.state, "Fetched from OpenF1");
                         let season = self.state.settings.effective_season(Utc::now().year());
                         let sessions = self
@@ -339,9 +333,19 @@ impl App {
                             false,
                             &mut refresh_tasks,
                         );
-                        schedule_weekend_refresh(&mut self.state, &self.db, false, &mut refresh_tasks);
+                        schedule_weekend_refresh(
+                            &mut self.state,
+                            &self.db,
+                            false,
+                            &mut refresh_tasks,
+                        );
                         sync_boot_championship(&mut self.state);
-                        extend_boot_media(&mut self.state, &self.assets, &self.db, &mut refresh_tasks);
+                        extend_boot_media(
+                            &mut self.state,
+                            &self.assets,
+                            &self.db,
+                            &mut refresh_tasks,
+                        );
                         finalize_boot_media_step(&mut self.state);
                         self.state.boot.try_finish();
                         return Task::batch(refresh_tasks);
@@ -356,7 +360,8 @@ impl App {
                             });
                         } else if let Ok(Some(mut data)) = self.db.calendar_from_cache(season) {
                             data.apply_preferences(self.state.settings.include_testing);
-                            self.state.load = LoadState::Ready(LoadedCalendar { data, stale: true });
+                            self.state.load =
+                                LoadState::Ready(LoadedCalendar { data, stale: true });
                         } else {
                             self.state.load = LoadState::Error {
                                 message: error,
@@ -380,10 +385,8 @@ impl App {
                         ));
                         let blob = DriversCacheBlob::from_drivers(&data);
                         let _ = self.db.save_drivers_cache(&blob);
-                        self.state.drivers = DriversLoadState::Ready(LoadedDrivers {
-                            data,
-                            stale: false,
-                        });
+                        self.state.drivers =
+                            DriversLoadState::Ready(LoadedDrivers { data, stale: false });
                         sync_boot_drivers_done(&mut self.state, "Fetched from OpenF1");
                         let mut tasks =
                             fetch_driver_media_tasks(&self.state, &self.assets, &self.db);
@@ -401,10 +404,8 @@ impl App {
                                 stale: true,
                             });
                         } else if let Ok(Some(data)) = self.db.drivers_from_cache(season) {
-                            self.state.drivers = DriversLoadState::Ready(LoadedDrivers {
-                                data,
-                                stale: true,
-                            });
+                            self.state.drivers =
+                                DriversLoadState::Ready(LoadedDrivers { data, stale: true });
                         } else {
                             self.state.drivers = DriversLoadState::Error {
                                 message: error,
@@ -422,10 +423,8 @@ impl App {
                 match result {
                     Ok(data) => {
                         persist_weekend_caches(&self.db, &data);
-                        self.state.weekend = WeekendLoadState::Ready(LoadedWeekend {
-                            data,
-                            stale: false,
-                        });
+                        self.state.weekend =
+                            WeekendLoadState::Ready(LoadedWeekend { data, stale: false });
                     }
                     Err(error) => {
                         debug::error(format!("Weekend detail fetch failed: {error}"));
@@ -435,10 +434,8 @@ impl App {
                                 stale: true,
                             });
                         } else if let Some(data) = load_weekend_from_db(&self.db, &self.state) {
-                            self.state.weekend = WeekendLoadState::Ready(LoadedWeekend {
-                                data,
-                                stale: true,
-                            });
+                            self.state.weekend =
+                                WeekendLoadState::Ready(LoadedWeekend { data, stale: true });
                         } else {
                             self.state.weekend = WeekendLoadState::Error {
                                 message: error,
@@ -461,33 +458,36 @@ impl App {
                         let blob = ChampionshipCacheBlob::from_data(&data);
                         let _ = self.db.save_championship_cache(&blob);
                         self.maybe_notify_standings(&data);
-                        self.state.championship = ChampionshipLoadState::Ready(LoadedChampionship {
-                            data,
-                            stale: false,
-                        });
+                        self.state.championship =
+                            ChampionshipLoadState::Ready(LoadedChampionship { data, stale: false });
                         sync_boot_championship_done(&mut self.state, "Fetched from OpenF1");
                     }
                     Err(error) => {
                         debug::error(format!("Championship fetch failed: {error}"));
                         let season = self.state.settings.effective_season(Utc::now().year());
                         if let ChampionshipLoadState::Ready(loaded) = &self.state.championship {
-                            self.state.championship = ChampionshipLoadState::Ready(LoadedChampionship {
-                                data: loaded.data.clone(),
-                                stale: true,
-                            });
+                            self.state.championship =
+                                ChampionshipLoadState::Ready(LoadedChampionship {
+                                    data: loaded.data.clone(),
+                                    stale: true,
+                                });
                             sync_boot_championship_done(&mut self.state, "Using cached standings");
                         } else if let Ok(Some(data)) = self.db.championship_from_cache(season) {
-                            self.state.championship = ChampionshipLoadState::Ready(LoadedChampionship {
-                                data,
-                                stale: true,
-                            });
+                            self.state.championship =
+                                ChampionshipLoadState::Ready(LoadedChampionship {
+                                    data,
+                                    stale: true,
+                                });
                             sync_boot_championship_done(&mut self.state, "Loaded from cache");
                         } else {
                             self.state.championship = ChampionshipLoadState::Error {
                                 message: error.clone(),
                                 cached: None,
                             };
-                            sync_boot_championship_failed(&mut self.state, "Could not load standings");
+                            sync_boot_championship_failed(
+                                &mut self.state,
+                                "Could not load standings",
+                            );
                         }
                     }
                 }
@@ -527,10 +527,9 @@ impl App {
                         } else {
                             bytes
                         };
-                        self.state.flag_images.insert(
-                            url,
-                            image::Handle::from_bytes(bytes::Bytes::from(bytes)),
-                        );
+                        self.state
+                            .flag_images
+                            .insert(url, image::Handle::from_bytes(bytes::Bytes::from(bytes)));
                     }
                     Err(_) => {
                         let _ = self.assets.mark_failed(&url);
@@ -547,10 +546,9 @@ impl App {
                 match result {
                     Ok(bytes) => {
                         self.state.headshot_failed.remove(&url);
-                        self.state.headshot_images.insert(
-                            url,
-                            image::Handle::from_bytes(bytes::Bytes::from(bytes)),
-                        );
+                        self.state
+                            .headshot_images
+                            .insert(url, image::Handle::from_bytes(bytes::Bytes::from(bytes)));
                     }
                     Err(_) => {
                         let _ = self.assets.mark_failed(&url);
@@ -611,16 +609,11 @@ impl App {
                         .hidden_window_mode
                         .take()
                         .unwrap_or(Mode::Windowed);
-                    return Task::batch([
-                        window::change_mode(id, mode),
-                        window::gain_focus(id),
-                    ]);
+                    return Task::batch([window::change_mode(id, mode), window::gain_focus(id)]);
                 }
                 Task::none()
             }
-            Message::QuitFromTray => {
-                iced::exit()
-            }
+            Message::QuitFromTray => iced::exit(),
             Message::TitleBarPressed => {
                 let now = Instant::now();
                 let is_double = self
@@ -709,7 +702,10 @@ impl App {
                 self.state.overlay = Overlay::DriverPicker;
                 restore_driver_picker_scroll(self.state.driver_picker_scroll)
             }
-            Message::RivalDriverSelected { slot, driver_number } => {
+            Message::RivalDriverSelected {
+                slot,
+                driver_number,
+            } => {
                 match slot {
                     0 => self.state.settings.rival_driver_first = driver_number,
                     _ => self.state.settings.rival_driver_second = driver_number,
@@ -761,11 +757,9 @@ impl App {
                 self.state.driver_picker = crate::domain::DriverPickerFilters::default();
                 self.state.driver_picker_scroll = iced::widget::scrollable::RelativeOffset::START;
                 self.state.overlay = Overlay::DriverPicker;
-                Task::batch(vec![
-                    restore_driver_picker_scroll(
-                        iced::widget::scrollable::RelativeOffset::START,
-                    ),
-                ])
+                Task::batch(vec![restore_driver_picker_scroll(
+                    iced::widget::scrollable::RelativeOffset::START,
+                )])
             }
             Message::WindowResized(size) => {
                 self.state.viewport = size;
@@ -782,10 +776,7 @@ impl App {
             }
             Message::HideToBackground(current_mode) => {
                 let restore = match current_mode {
-                    Mode::Hidden => self
-                        .state
-                        .hidden_window_mode
-                        .unwrap_or(Mode::Windowed),
+                    Mode::Hidden => self.state.hidden_window_mode.unwrap_or(Mode::Windowed),
                     mode => mode,
                 };
                 self.state.hidden_window_mode = Some(restore);
@@ -821,9 +812,9 @@ impl App {
             Message::SettingsToggled(toggle) => {
                 match toggle {
                     SettingsToggle::IncludeTesting => {
-                        self.state.settings.include_testing =
-                            !self.state.settings.include_testing;
-                        if let Some(season) = self.state.calendar().map(|calendar| calendar.season) {
+                        self.state.settings.include_testing = !self.state.settings.include_testing;
+                        if let Some(season) = self.state.calendar().map(|calendar| calendar.season)
+                        {
                             if let Ok(Some(mut data)) = self.db.calendar_from_cache(season) {
                                 data.apply_preferences(self.state.settings.include_testing);
                                 match &mut self.state.load {
@@ -850,8 +841,7 @@ impl App {
                             !self.state.settings.notify_standings;
                     }
                     SettingsToggle::NotifySessions => {
-                        self.state.settings.notify_sessions =
-                            !self.state.settings.notify_sessions;
+                        self.state.settings.notify_sessions = !self.state.settings.notify_sessions;
                     }
                 }
                 let _ = self.db.save_settings(&self.state.settings);
@@ -903,8 +893,7 @@ impl App {
                         self.state.driver_picker.sort_direction.toggle();
                 } else {
                     self.state.driver_picker.sort_field = field;
-                    self.state.driver_picker.sort_direction =
-                        crate::domain::SortDirection::Asc;
+                    self.state.driver_picker.sort_direction = crate::domain::SortDirection::Asc;
                 }
                 Task::none()
             }
@@ -973,9 +962,15 @@ impl App {
                         self.state
                             .boot
                             .complete_step(BootStepId::Settings, format!("Season {season} ready"));
-                        self.state.boot.start_step(BootStepId::Calendar, "Fetching from OpenF1...");
-                        self.state.boot.start_step(BootStepId::Drivers, "Fetching from OpenF1...");
-                        self.state.boot.start_step(BootStepId::Championship, "Fetching from OpenF1...");
+                        self.state
+                            .boot
+                            .start_step(BootStepId::Calendar, "Fetching from OpenF1...");
+                        self.state
+                            .boot
+                            .start_step(BootStepId::Drivers, "Fetching from OpenF1...");
+                        self.state
+                            .boot
+                            .start_step(BootStepId::Championship, "Fetching from OpenF1...");
                         self.state.refreshing = true;
                         self.state.drivers_refreshing = true;
                         return Task::batch([
@@ -1012,13 +1007,18 @@ impl App {
                         self.state.drivers_refreshing = true;
                         self.state.weekend_refreshing = true;
                         self.state.boot.reset();
-                        self.state.boot.complete_step(
-                            BootStepId::Settings,
-                            "Settings and pins preserved",
-                        );
-                        self.state.boot.start_step(BootStepId::Calendar, "Fetching from OpenF1...");
-                        self.state.boot.start_step(BootStepId::Drivers, "Fetching from OpenF1...");
-                        self.state.boot.start_step(BootStepId::Championship, "Fetching from OpenF1...");
+                        self.state
+                            .boot
+                            .complete_step(BootStepId::Settings, "Settings and pins preserved");
+                        self.state
+                            .boot
+                            .start_step(BootStepId::Calendar, "Fetching from OpenF1...");
+                        self.state
+                            .boot
+                            .start_step(BootStepId::Drivers, "Fetching from OpenF1...");
+                        self.state
+                            .boot
+                            .start_step(BootStepId::Championship, "Fetching from OpenF1...");
                         let season = self.state.settings.effective_season(Utc::now().year());
                         return Task::batch([
                             fetch_calendar_task(season),
@@ -1151,7 +1151,10 @@ fn fetch_flag_tasks(
         .map(|url| {
             Task::perform(
                 fetch_image_cached(assets.clone(), url.clone()),
-                move |result| Message::FlagLoaded { url: url.clone(), result },
+                move |result| Message::FlagLoaded {
+                    url: url.clone(),
+                    result,
+                },
             )
         })
         .collect()
@@ -1197,7 +1200,10 @@ fn fetch_driver_media_tasks(
         .map(|url| {
             Task::perform(
                 fetch_image_cached(assets.clone(), url.clone()),
-                move |result| Message::HeadshotLoaded { url: url.clone(), result },
+                move |result| Message::HeadshotLoaded {
+                    url: url.clone(),
+                    result,
+                },
             )
         })
         .collect();
@@ -1213,7 +1219,10 @@ fn fetch_driver_media_tasks(
             .map(|url| {
                 Task::perform(
                     fetch_image_cached(assets.clone(), url.clone()),
-                    move |result| Message::FlagLoaded { url: url.clone(), result },
+                    move |result| Message::FlagLoaded {
+                        url: url.clone(),
+                        result,
+                    },
                 )
             }),
     );
@@ -1257,9 +1266,7 @@ async fn fetch_image_cached(assets: AssetStore, url: String) -> Result<Vec<u8>, 
 }
 
 async fn fetch_image_network(url: &str) -> Result<Vec<u8>, String> {
-    let response = reqwest::get(url)
-        .await
-        .map_err(|error| error.to_string())?;
+    let response = reqwest::get(url).await.map_err(|error| error.to_string())?;
     if !response.status().is_success() {
         return Err(format!("HTTP {}", response.status()));
     }
@@ -1319,9 +1326,8 @@ fn schedule_championship_refresh(
         .flatten()
         .map(|entry| cache_is_fresh(&entry, now))
         .unwrap_or(false);
-    let needs_refresh = force
-        || !fresh
-        || championship_needs_refresh(cached.as_ref(), &sessions, now);
+    let needs_refresh =
+        force || !fresh || championship_needs_refresh(cached.as_ref(), &sessions, now);
 
     if let Some(data) = cached.clone() {
         if state.championship_data().is_none() {
@@ -1379,9 +1385,13 @@ fn sync_boot_calendar(state: &mut AppState) {
             );
         }
         LoadState::Ready(_) => {
-            state.boot.complete_step(BootStepId::Calendar, "Loaded from cache");
+            state
+                .boot
+                .complete_step(BootStepId::Calendar, "Loaded from cache");
         }
-        LoadState::Error { cached: Some(_), .. } => {
+        LoadState::Error {
+            cached: Some(_), ..
+        } => {
             state
                 .boot
                 .fail_step(BootStepId::Calendar, "Using cached calendar");
@@ -1435,10 +1445,16 @@ fn sync_boot_drivers(state: &mut AppState) {
             );
         }
         DriversLoadState::Ready(_) => {
-            state.boot.complete_step(BootStepId::Drivers, "Loaded from cache");
+            state
+                .boot
+                .complete_step(BootStepId::Drivers, "Loaded from cache");
         }
-        DriversLoadState::Error { cached: Some(_), .. } => {
-            state.boot.fail_step(BootStepId::Drivers, "Using cached roster");
+        DriversLoadState::Error {
+            cached: Some(_), ..
+        } => {
+            state
+                .boot
+                .fail_step(BootStepId::Drivers, "Using cached roster");
         }
         DriversLoadState::Loading => {
             state
@@ -1502,7 +1518,9 @@ fn sync_boot_championship(state: &mut AppState) {
                     .start_step(BootStepId::Championship, "Waiting for calendar...");
             }
         }
-        ChampionshipLoadState::Error { cached: Some(_), .. } => {
+        ChampionshipLoadState::Error {
+            cached: Some(_), ..
+        } => {
             state
                 .boot
                 .fail_step(BootStepId::Championship, "Using cached standings");
@@ -1570,7 +1588,9 @@ fn finalize_boot_media_step(state: &mut AppState) {
 
     let media = state.boot.step_mut(BootStepId::Media);
     if media.status == crate::state::BootStepStatus::Pending {
-        state.boot.complete_step(BootStepId::Media, "Nothing to download");
+        state
+            .boot
+            .complete_step(BootStepId::Media, "Nothing to download");
     }
 }
 
@@ -1595,10 +1615,7 @@ fn schedule_weekend_refresh(
         .map(|pin| pin.driver_number)
         .collect();
 
-    let cached_grid = db
-        .load_quali_grid_cache(focus_meeting_key)
-        .ok()
-        .flatten();
+    let cached_grid = db.load_quali_grid_cache(focus_meeting_key).ok().flatten();
     let mut cached_track = HashMap::new();
     let mut cached_forecasts = HashMap::new();
     let mut weather_stale = false;

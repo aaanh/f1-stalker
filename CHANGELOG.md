@@ -4,6 +4,35 @@ All notable changes to F1 Stalker are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.2] - 2026-06-15
+
+M8&ndash;M10 milestone release: personalization, background behaviour, onboarding, and standings polish.
+
+### Added
+
+- **Starting grid** positions in championship snapshots and standings table (race mode).
+- **Position-change arrows** (Lucide chevrons) beside standings ranks with fixed-width mono columns for two-digit positions and DNF/DNS/DSQ.
+- **Podium driver cards** on Previous/Current race session cards.
+- **Rival average quali** stat in the Driver rivalry section.
+- **Custom theme editor** with SQLite persistence and WCAG AA contrast audit for presets.
+- **Tray menu Refresh** action; **macOS dock hide** when running in background.
+- **Single-instance focus** when a second launch is attempted.
+- **Notification dedupe** so repeated standings alerts are not sent for the same signature.
+- **Multi-step first-run wizard** (welcome, timezone, pin picker, done).
+
+### Changed
+
+- Compare rivals control moved to the chart header first row alongside Championship / Race standing tabs.
+- Championship narrative banner stays visible when rival compare is active.
+- Rivalry hint copy is always shown when both rivals are selected.
+- Standings table uses the pinned-card column grid (1/2/3 columns by width).
+- Spec documents reorganized into versioned files (`.specs/v0.0.0.md`, `v0.1.0.md`, `v0.2.0.draft.md`).
+
+### Fixed
+
+- Chart header layout: mode tabs and Compare rivals no longer collapse to zero width.
+- Red Bull preset accent brightened to pass WCAG AA contrast checks.
+
 ## [0.1.1] - 2026-06-15
 
 Patch release. Dashboard polish, standings table, accessibility, and pin/chart behaviour updates.
@@ -54,6 +83,7 @@ Initial v1 release (committed on `master`).
 - GitHub Actions release workflow and build scripts (macOS DMG, Windows zip, Linux tarball).
 - Project site with downloadable release artifacts.
 
-[Unreleased]: https://gitlab.com/aaanh/f1-stalker/compare/v0.1.1...master
+[Unreleased]: https://gitlab.com/aaanh/f1-stalker/compare/v0.1.2...master
+[0.1.2]: https://gitlab.com/aaanh/f1-stalker/compare/v0.1.1...v0.1.2
 [0.1.1]: https://gitlab.com/aaanh/f1-stalker/compare/v0.1.0...v0.1.1
 [0.1.0]: https://gitlab.com/aaanh/f1-stalker/-/tags/v0.1.0
