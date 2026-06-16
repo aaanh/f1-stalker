@@ -5,23 +5,6 @@ use openf1::{Meeting, Session};
 
 use crate::domain::calendar::{parse_end, parse_start, RaceTriplet};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct SeasonCalendarDayId {
-    pub year: i32,
-    pub month: u32,
-    pub day: u32,
-}
-
-impl SeasonCalendarDayId {
-    pub fn from_date(date: NaiveDate) -> Self {
-        Self {
-            year: date.year(),
-            month: date.month(),
-            day: date.day(),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RacePhase {
     Past,
@@ -37,7 +20,6 @@ pub struct DaySession {
 
 #[derive(Debug, Clone)]
 pub struct SeasonCalendarDay {
-    pub id: SeasonCalendarDayId,
     pub date: NaiveDate,
     pub phase: Option<RacePhase>,
     pub meeting_name: Option<String>,
@@ -96,9 +78,7 @@ pub fn build_season_calendar(
         };
 
         let date = local_date(parse_session_start(session));
-        let id = SeasonCalendarDayId::from_date(date);
         let entry = day_map.entry(date).or_insert_with(|| SeasonCalendarDay {
-            id,
             date,
             phase: None,
             meeting_name: None,
@@ -145,7 +125,6 @@ fn build_month(
         .map(|day| {
             let date = NaiveDate::from_ymd_opt(year, month, day).expect("valid day");
             day_map.get(&date).cloned().unwrap_or_else(|| SeasonCalendarDay {
-                id: SeasonCalendarDayId::from_date(date),
                 date,
                 phase: None,
                 meeting_name: None,
@@ -249,8 +228,12 @@ mod tests {
         }
     }
 
-    fn day_by_id(calendar: &SeasonCalendar, id: SeasonCalendarDayId) -> Option<&SeasonCalendarDay> {
-        calendar.months.iter().flat_map(|month| month.days.iter()).find(|day| day.id == id)
+    fn day_by_date(calendar: &SeasonCalendar, date: NaiveDate) -> Option<&SeasonCalendarDay> {
+        calendar
+            .months
+            .iter()
+            .flat_map(|month| month.days.iter())
+            .find(|day| day.date == date)
     }
 
     #[test]
@@ -293,13 +276,9 @@ mod tests {
         let triplet = compute_race_triplet(&meetings, now).unwrap();
         let calendar = build_season_calendar(&meetings, &sessions, &triplet, now).unwrap();
 
-        let practice_day = day_by_id(
+        let practice_day = day_by_date(
             &calendar,
-            SeasonCalendarDayId {
-                year: 2026,
-                month: 3,
-                day: 1,
-            },
+            NaiveDate::from_ymd_opt(2026, 3, 1).unwrap(),
         )
         .expect("practice day");
         assert_eq!(practice_day.sessions.len(), 2);
@@ -325,31 +304,19 @@ mod tests {
         let triplet = compute_race_triplet(&meetings, now).unwrap();
         let calendar = build_season_calendar(&meetings, &sessions, &triplet, now).unwrap();
 
-        let past = day_by_id(
+        let past = day_by_date(
             &calendar,
-            SeasonCalendarDayId {
-                year: 2026,
-                month: 3,
-                day: 2,
-            },
+            NaiveDate::from_ymd_opt(2026, 3, 2).unwrap(),
         )
         .unwrap();
-        let current = day_by_id(
+        let current = day_by_date(
             &calendar,
-            SeasonCalendarDayId {
-                year: 2026,
-                month: 6,
-                day: 2,
-            },
+            NaiveDate::from_ymd_opt(2026, 6, 2).unwrap(),
         )
         .unwrap();
-        let future = day_by_id(
+        let future = day_by_date(
             &calendar,
-            SeasonCalendarDayId {
-                year: 2026,
-                month: 12,
-                day: 2,
-            },
+            NaiveDate::from_ymd_opt(2026, 12, 2).unwrap(),
         )
         .unwrap();
 

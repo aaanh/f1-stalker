@@ -1,4 +1,5 @@
 import { APP_VERSION, releaseDownloads } from "@/lib/releases"
+import { ChangelogSection } from "@/components/changelog-section"
 import { Logo } from "@/components/logo"
 import { ButtonGroup } from "./components/ui/button-group"
 import { buttonVariants } from "./components/ui/button"
@@ -61,6 +62,7 @@ export function App() {
                 </a>
               ))}
             </ButtonGroup>
+            <ChangelogSection />
             <h2>Demo video</h2>
             <iframe
               src="https://www.linkedin.com/embed/feed/update/urn:li:ugcPost:7471070502682411008?collapsed=1"

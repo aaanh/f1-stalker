@@ -136,4 +136,16 @@
   p a {
     @apply underline decoration-red-500 decoration-dotted underline-offset-4 hover:text-red-500;
   }
+
+  .changelog-markdown h2 {
+    @apply mt-10 border-b border-border pb-2 first:mt-6;
+  }
+
+  .changelog-markdown h3 {
+    @apply mt-4 text-lg;
+  }
+
+  .changelog-markdown ul {
+    @apply my-3;
+  }
 }

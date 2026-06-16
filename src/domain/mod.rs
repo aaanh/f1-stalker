@@ -22,8 +22,7 @@ pub use calendar::{
     compute_race_triplet, season_phase, RaceTriplet, RaceTripletSlot, SeasonPhase,
 };
 pub use season_calendar::{
-    build_season_calendar, DaySession, RacePhase, SeasonCalendarDay, SeasonCalendarDayId,
-    SeasonCalendarMonth,
+    build_season_calendar, DaySession, RacePhase, SeasonCalendarDay, SeasonCalendarMonth,
 };
 pub use circuit_assets::{circuit_image_url, is_circuit_image_url, prepare_circuit_image};
 pub use championship::{
