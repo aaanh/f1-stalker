@@ -4,6 +4,28 @@ All notable changes to F1 Stalker are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.3] - 2026-06-16
+
+Season calendar release: full-season month grid with session-day highlights and hover popovers.
+
+### Added
+
+- **Season calendar** dashboard section spanning first to last Grand Prix (`src/domain/season_calendar.rs`, `src/ui/season_calendar.rs`).
+- Month grids with practice, qualifying, sprint, and race days color-coded by meeting phase (past, current/upcoming, future).
+- **Tooltip popover** on date hover showing Grand Prix round and session schedule (or &ldquo;No session scheduled&rdquo;).
+- Horizontally scrollable month strip; legend for phase colors.
+- **Calendar** Lucide icon and `.specs/v0.1.3.md`.
+- Maintainer release procedure in `RELEASE.md`.
+
+### Changed
+
+- README links to GitLab Releases and documents maintainer release steps.
+
+### Fixed
+
+- Season calendar horizontal scroll no longer panics on layout validation.
+- Month grid uses fixed cell sizing so columns are not squeezed into the viewport.
+
 ## [0.1.2] - 2026-06-15
 
 M8&ndash;M10 milestone release: personalization, background behaviour, onboarding, and standings polish.
@@ -83,7 +105,8 @@ Initial v1 release (committed on `master`).
 - GitHub Actions release workflow and build scripts (macOS DMG, Windows zip, Linux tarball).
 - Project site with downloadable release artifacts.
 
-[Unreleased]: https://gitlab.com/aaanh/f1-stalker/compare/v0.1.2...master
+[Unreleased]: https://gitlab.com/aaanh/f1-stalker/compare/v0.1.3...master
+[0.1.3]: https://gitlab.com/aaanh/f1-stalker/compare/v0.1.2...v0.1.3
 [0.1.2]: https://gitlab.com/aaanh/f1-stalker/compare/v0.1.1...v0.1.2
 [0.1.1]: https://gitlab.com/aaanh/f1-stalker/compare/v0.1.0...v0.1.1
 [0.1.0]: https://gitlab.com/aaanh/f1-stalker/-/tags/v0.1.0

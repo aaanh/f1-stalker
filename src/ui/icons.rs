@@ -32,6 +32,7 @@ pub enum Icon {
     Trash,
     Database,
     FileText,
+    Calendar,
     Maximize,
 }
 
@@ -63,6 +64,7 @@ impl Icon {
             Icon::Trash => include_bytes!("../assets/icons/trash.svg"),
             Icon::Database => include_bytes!("../assets/icons/database.svg"),
             Icon::FileText => include_bytes!("../assets/icons/file-text.svg"),
+            Icon::Calendar => include_bytes!("../assets/icons/calendar.svg"),
             Icon::Maximize => include_bytes!("../assets/icons/maximize-2.svg"),
         }
     }

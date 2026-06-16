@@ -24,6 +24,7 @@ use crate::ui::standings_table::standings_section;
 use crate::ui::theme::{
     accent, border, muted, surface, text_color, FLAG_BLUE, FLAG_GREEN, FLAG_YELLOW,
 };
+use crate::ui::season_calendar::season_calendar_section;
 use crate::ui::weather_panel::meeting_weather_panel;
 
 pub fn dashboard(state: &AppState, layout: LayoutConfig) -> Element<'_, Message> {
@@ -107,6 +108,9 @@ fn calendar_section(state: &AppState, layout: LayoutConfig) -> Element<'_, Messa
             }
             section = section.push(countdown_hero(state, layout));
             section = section.push(race_cards(state, state.animation_phase, layout));
+            if let Some(season_calendar) = season_calendar_section(state, layout) {
+                section = section.push(season_calendar);
+            }
             section.width(Length::Fill).height(Length::Shrink).into()
         }
     }

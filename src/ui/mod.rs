@@ -16,6 +16,7 @@ mod weather_panel;
 mod rival_mode;
 mod scroll;
 mod settings;
+mod season_calendar;
 mod standings_table;
 mod shell;
 mod title_bar;

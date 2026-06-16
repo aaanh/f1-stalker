@@ -13,7 +13,9 @@ And if you're a sadistically masochistic, you would have built it in Rust, like 
 
 # Installation
 
-Please check out the Releases page of this project to find the right distribution for your OS.
+Please check out the [Releases](https://gitlab.com/aaanh/f1-stalker/-/releases) page of this project to find the right distribution for your OS.
+
+Maintainers: see [RELEASE.md](RELEASE.md) for the full build and publish procedure.
 
 I currently support:
 
@@ -54,6 +56,10 @@ These commands are to be run inside a terminal emulator (Terminal, GNOME Termina
 > Github is a read-only mirror. Pull requests (PR) and issues submitted on Github are not monitored, much like how the `torvalds/linux` repository works.
 
 Contributions come in 2 flavors: pull requests and issue submissions.
+
+## Releases (maintainers)
+
+End-to-end versioning, cross-platform builds, tagging, and GitLab release steps are documented in [RELEASE.md](RELEASE.md).
 
 ## GitHub mirror (maintainers)
 

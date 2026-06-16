@@ -1,5 +1,6 @@
 pub mod calendar;
 pub mod calendar_filter;
+pub mod season_calendar;
 pub mod championship;
 pub mod grid;
 pub mod narrative;
@@ -19,6 +20,10 @@ pub use driver_assets::{driver_flag_iso2, driver_flag_url, team_logo_display_url
 
 pub use calendar::{
     compute_race_triplet, season_phase, RaceTriplet, RaceTripletSlot, SeasonPhase,
+};
+pub use season_calendar::{
+    build_season_calendar, DaySession, RacePhase, SeasonCalendarDay, SeasonCalendarDayId,
+    SeasonCalendarMonth,
 };
 pub use circuit_assets::{circuit_image_url, is_circuit_image_url, prepare_circuit_image};
 pub use championship::{
