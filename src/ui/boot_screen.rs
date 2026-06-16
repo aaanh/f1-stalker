@@ -62,7 +62,6 @@ fn boot_card(boot: &BootState) -> Element<'static, Message> {
 fn step_row(step: &crate::state::bootstrap::BootStep) -> Element<'static, Message> {
     let (marker, marker_color, label_color) = match step.status {
         BootStepStatus::Done => (Icon::Check, live(), text_color()),
-        BootStepStatus::Skipped => (Icon::Minus, muted(), muted()),
         BootStepStatus::Failed => (Icon::Alert, accent(), text_color()),
         BootStepStatus::Running => (Icon::Loader, accent(), text_color()),
         BootStepStatus::Pending => (Icon::Circle, muted(), muted()),

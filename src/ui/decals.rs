@@ -4,7 +4,7 @@ use iced::{Color, Element, Length};
 use crate::state::Message;
 use crate::ui::icons::{icon, Icon};
 use crate::ui::theme::{
-    CHECKER_DARK, CHECKER_LIGHT, FLAG_BLACK, FLAG_GREEN, FLAG_RED, FLAG_YELLOW, surface,
+    CHECKER_DARK, CHECKER_LIGHT, FLAG_GREEN, FLAG_RED, FLAG_YELLOW, surface,
     text_color,
 };
 
@@ -13,12 +13,6 @@ const CELL: f32 = 8.0;
 /// Slow animation tick derived from the 50ms frame counter (~1.5s per step).
 fn slow_phase(frame: u32) -> u32 {
     frame / 30
-}
-
-use crate::assets::header_brand;
-
-pub fn header_branding() -> Element<'static, Message> {
-    header_brand()
 }
 
 fn checkered_patch(cols: usize, rows: usize, shift: u32) -> Element<'static, Message> {
@@ -52,7 +46,6 @@ pub enum FlagSignal {
     Live,
     Intermission,
     Next,
-    Finished,
     Alert,
 }
 
@@ -69,7 +62,6 @@ pub fn signal_flag_sized<'a>(
         FlagSignal::Live => FLAG_GREEN,
         FlagSignal::Intermission => FLAG_YELLOW,
         FlagSignal::Next => FLAG_GREEN,
-        FlagSignal::Finished => FLAG_BLACK,
         FlagSignal::Alert => FLAG_RED,
     };
 

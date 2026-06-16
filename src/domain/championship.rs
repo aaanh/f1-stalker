@@ -3,6 +3,7 @@ use iced::Color;
 use openf1::{Driver, Meeting, Session};
 
 use crate::db::PinnedDriver;
+use crate::domain::grid::GridSlot;
 use crate::domain::{driver_display_name, team_colour};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
@@ -58,6 +59,7 @@ impl ChartMode {
 pub struct StandingPoint {
     pub round: u32,
     pub position: i64,
+    #[allow(dead_code)]
     pub points: i64,
 }
 
@@ -77,6 +79,7 @@ pub struct ChampionshipRoundSnapshot {
     pub drivers: Vec<DriverStandingSnapshot>,
     pub teams: Vec<TeamStandingSnapshot>,
     pub race_results: Vec<RaceResultSnapshot>,
+    pub starting_grid: Vec<GridSlot>,
 }
 
 #[derive(Debug, Clone)]
@@ -651,6 +654,7 @@ mod tests {
                     },
                 ],
                 race_results: race_results_for_round(&[(1, 2, 18, false), (44, 1, 25, false)]),
+                starting_grid: vec![],
             },
             ChampionshipRoundSnapshot {
                 round: 2,
@@ -685,6 +689,7 @@ mod tests {
                     },
                 ],
                 race_results: race_results_for_round(&[(1, 1, 25, false), (44, 3, 8, false)]),
+                starting_grid: vec![],
             },
         ];
         let pinned = vec![PinnedDriver {
@@ -739,6 +744,7 @@ mod tests {
                 },
             ],
             race_results: race_results_for_round(&[(1, 4, 12, false)]),
+            starting_grid: vec![],
         }];
         let pinned = vec![PinnedDriver {
             driver_number: 1,

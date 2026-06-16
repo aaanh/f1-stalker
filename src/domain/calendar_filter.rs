@@ -7,14 +7,6 @@ pub fn is_testing_meeting(meeting: &Meeting) -> bool {
     name.contains("test") || official.contains("test")
 }
 
-pub fn filter_calendar_meetings(meetings: &[Meeting], include_testing: bool) -> Vec<Meeting> {
-    meetings
-        .iter()
-        .filter(|meeting| include_testing || !is_testing_meeting(meeting))
-        .cloned()
-        .collect()
-}
-
 pub fn next_session_reminder_at(
     sessions: &[openf1::Session],
     now: DateTime<Utc>,

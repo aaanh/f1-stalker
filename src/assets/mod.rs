@@ -91,13 +91,3 @@ pub fn about_brand() -> Element<'static, Message> {
     .width(Length::Fill)
     .into()
 }
-
-pub fn header_brand() -> Element<'static, Message> {
-    row![
-        logo(36.0, LOGO_BOOT),
-        Space::with_width(12),
-        text(APP_DISPLAY_NAME).size(30).color(accent()),
-    ]
-    .align_y(iced::Alignment::Center)
-    .into()
-}

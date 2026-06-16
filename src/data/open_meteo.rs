@@ -47,6 +47,7 @@ struct GeocodeResult {
     #[serde(default)]
     country_code: String,
     #[serde(default)]
+    #[allow(dead_code)]
     feature_code: String,
 }
 
@@ -369,8 +370,6 @@ fn weather_code_description(code: i64) -> String {
 
 #[cfg(test)]
 mod tests {
-    use chrono::Datelike;
-
     use super::*;
 
     fn monaco_meeting() -> Meeting {

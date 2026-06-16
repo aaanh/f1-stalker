@@ -9,8 +9,6 @@ use crate::domain::weather::{latest_track_conditions, most_recent_completed_sess
 pub enum FetchError {
     #[error("openf1: {0}")]
     Api(#[from] OpenF1Error),
-    #[error("no completed sessions")]
-    NoSessions,
 }
 
 #[derive(Debug, Clone)]

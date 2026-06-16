@@ -143,33 +143,31 @@ pub fn secondary_button_icon(
         .into()
 }
 
-pub fn section_card<'a>(
-    title: &'static str,
-    body: Element<'a, Message>,
-    font_scale: f32,
-) -> Element<'a, Message> {
-    section_card_icon(None, title, body, font_scale)
-}
+fn button_group(segments: std::vec::Vec<Element<'static, Message>>) -> Element<'static, Message> {
+    let mut items: std::vec::Vec<Element<Message>> = Vec::new();
+    for (index, segment) in segments.into_iter().enumerate() {
+        if index > 0 {
+            items.push(group_divider());
+        }
+        items.push(segment);
+    }
 
-pub fn section_card_icon<'a>(
-    icon_kind: Option<Icon>,
-    title: &'static str,
-    body: Element<'a, Message>,
-    font_scale: f32,
-) -> Element<'a, Message> {
-    container(column_section(icon_kind, title, body, font_scale))
-        .padding(16)
-        .width(Length::Fill)
-        .style(|_| container::Style {
-            background: Some(surface().into()),
-            border: iced::Border {
-                color: border(),
-                width: 1.0,
-                radius: 8.0.into(),
-            },
-            ..Default::default()
-        })
-        .into()
+    container(
+        row(items)
+            .spacing(0)
+            .align_y(iced::Alignment::Center),
+    )
+    .padding(1)
+    .style(|_| container::Style {
+        background: Some(surface().into()),
+        border: iced::Border {
+            color: border(),
+            width: 1.0,
+            radius: GROUP_RADIUS.into(),
+        },
+        ..Default::default()
+    })
+    .into()
 }
 
 fn button_label(
@@ -216,69 +214,25 @@ fn column_section<'a>(
         .into()
 }
 
-pub fn modal_card(
+pub fn section_card_icon<'a>(
+    icon_kind: Option<Icon>,
     title: &'static str,
-    body: Element<'static, Message>,
-    footer: Element<'static, Message>,
-) -> Element<'static, Message> {
-    container(
-        iced::widget::column![
-            text(title).size(18).color(text_color()),
-            Space::with_height(12),
-            body,
-            Space::with_height(16),
-            footer,
-        ]
-        .spacing(4)
-        .width(Length::Fill),
-    )
-    .padding(20)
-    .width(Length::Fixed(420.0))
-    .style(|_| container::Style {
-        background: Some(surface().into()),
-        border: iced::Border {
-            color: border(),
-            width: 1.0,
-            radius: 10.0.into(),
-        },
-        shadow: iced::Shadow {
-            color: iced::Color {
-                a: 0.45,
-                ..iced::Color::BLACK
+    body: Element<'a, Message>,
+    font_scale: f32,
+) -> Element<'a, Message> {
+    container(column_section(icon_kind, title, body, font_scale))
+        .padding(16)
+        .width(Length::Fill)
+        .style(|_| container::Style {
+            background: Some(surface().into()),
+            border: iced::Border {
+                color: border(),
+                width: 1.0,
+                radius: 8.0.into(),
             },
-            offset: iced::Vector::new(0.0, 8.0),
-            blur_radius: 24.0,
-        },
-        ..Default::default()
-    })
-    .into()
-}
-
-fn button_group(segments: std::vec::Vec<Element<'static, Message>>) -> Element<'static, Message> {
-    let mut items: std::vec::Vec<Element<Message>> = std::vec::Vec::new();
-    for (index, segment) in segments.into_iter().enumerate() {
-        if index > 0 {
-            items.push(group_divider());
-        }
-        items.push(segment);
-    }
-
-    container(
-        row(items)
-            .spacing(0)
-            .align_y(iced::Alignment::Center),
-    )
-    .padding(1)
-    .style(|_| container::Style {
-        background: Some(surface().into()),
-        border: iced::Border {
-            color: border(),
-            width: 1.0,
-            radius: GROUP_RADIUS.into(),
-        },
-        ..Default::default()
-    })
-    .into()
+            ..Default::default()
+        })
+        .into()
 }
 
 fn group_divider() -> Element<'static, Message> {

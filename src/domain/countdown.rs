@@ -1,12 +1,6 @@
 use chrono::{DateTime, Duration, Utc};
 use openf1::{Meeting, Session};
 
-#[derive(Debug, Clone)]
-pub struct SessionSchedule {
-    pub meeting_key: i64,
-    pub sessions: Vec<Session>,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CountdownTarget {
     NextSession {
@@ -15,23 +9,6 @@ pub enum CountdownTarget {
     },
     SchedulePending,
     SeasonComplete,
-}
-
-pub fn sessions_for_meeting(sessions: &[Session], meeting_key: i64) -> SessionSchedule {
-    let mut list: Vec<Session> = sessions
-        .iter()
-        .filter(|s| s.meeting_key == meeting_key && !s.is_cancelled)
-        .cloned()
-        .collect();
-    list.sort_by(|a, b| parse_start(a).cmp(&parse_start(b)));
-    SessionSchedule {
-        meeting_key,
-        sessions: list,
-    }
-}
-
-pub fn next_countdown(schedule: &SessionSchedule, now: DateTime<Utc>) -> CountdownTarget {
-    next_season_countdown(&[], &schedule.sessions, now)
 }
 
 /// Next session across the full season calendar (advances to the next meeting when the
@@ -77,15 +54,6 @@ fn parse_meeting_end(meeting: &Meeting) -> DateTime<Utc> {
 pub struct CountdownSegment {
     pub value: String,
     pub label: &'static str,
-}
-
-pub fn format_countdown(now: DateTime<Utc>, target: DateTime<Utc>) -> String {
-    format_countdown_precise(now, target)
-}
-
-/// F1-style countdown with millisecond precision (`DD:HH:MM:SS.mmm` or `HH:MM:SS.mmm`).
-pub fn format_countdown_precise(now: DateTime<Utc>, target: DateTime<Utc>) -> String {
-    format_countdown_segments(&countdown_segments(now, target))
 }
 
 pub fn countdown_segments(now: DateTime<Utc>, target: DateTime<Utc>) -> Vec<CountdownSegment> {
@@ -160,31 +128,8 @@ fn decompose_remaining(remaining: Duration) -> (i64, i64, i64, i64, i64) {
     (days, hours, mins, secs, millis)
 }
 
-fn format_countdown_segments(segments: &[CountdownSegment]) -> String {
-    if segments.len() < 2 {
-        return segments
-            .first()
-            .map(|segment| segment.value.clone())
-            .unwrap_or_else(|| "00:00:00.000".into());
-    }
-
-    let (time, millis) = segments.split_at(segments.len() - 1);
-    format!(
-        "{}.{}",
-        time.iter()
-            .map(|segment| segment.value.as_str())
-            .collect::<Vec<_>>()
-            .join(":"),
-        millis[0].value
-    )
-}
-
 fn parse_start(session: &Session) -> DateTime<Utc> {
     parse_dt(&session.date_start)
-}
-
-fn parse_end(session: &Session) -> DateTime<Utc> {
-    parse_dt(&session.date_end)
 }
 
 fn parse_dt(value: &str) -> DateTime<Utc> {
@@ -221,26 +166,23 @@ mod tests {
 
     #[test]
     fn picks_next_session() {
-        let schedule = SessionSchedule {
-            meeting_key: 99,
-            sessions: vec![
-                session(
-                    "Practice 1",
-                    "2026-03-08T10:00:00Z",
-                    "2026-03-08T11:00:00Z",
-                ),
-                session(
-                    "Qualifying",
-                    "2026-03-09T14:00:00Z",
-                    "2026-03-09T15:00:00Z",
-                ),
-            ],
-        };
+        let sessions = vec![
+            session(
+                "Practice 1",
+                "2026-03-08T10:00:00Z",
+                "2026-03-08T11:00:00Z",
+            ),
+            session(
+                "Qualifying",
+                "2026-03-09T14:00:00Z",
+                "2026-03-09T15:00:00Z",
+            ),
+        ];
         let now = DateTime::parse_from_rfc3339("2026-03-08T12:00:00Z")
             .unwrap()
             .with_timezone(&Utc);
 
-        let target = next_countdown(&schedule, now);
+        let target = next_season_countdown(&[], &sessions, now);
         assert_eq!(
             target,
             CountdownTarget::NextSession {
@@ -320,7 +262,6 @@ mod tests {
                 },
             ]
         );
-        assert_eq!(format_countdown_precise(now, target), "02:03:04:05.006");
     }
 
     #[test]
@@ -333,7 +274,6 @@ mod tests {
         let segments = countdown_segments(now, target);
         assert_eq!(segments.len(), 4);
         assert_eq!(segments[0].label, "HRS");
-        assert_eq!(format_countdown_precise(now, target), "01:02:03.004");
     }
 
     #[test]

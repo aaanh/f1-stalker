@@ -4,7 +4,7 @@ use openf1::{Meeting, Session};
 use crate::data::ChampionshipData;
 use crate::data::QualiGridData;
 use crate::db::store::CacheEntry;
-use crate::domain::championship::{completed_race_sessions, ChampionshipRoundSnapshot};
+use crate::domain::championship::completed_race_sessions;
 use crate::domain::{find_gp_qualifying, quali_has_ended};
 
 pub fn cache_is_fresh(entry: &CacheEntry, now: DateTime<Utc>) -> bool {
@@ -36,7 +36,7 @@ pub fn championship_needs_refresh(
 
 pub fn weekend_weather_needs_refresh(
     meetings: &[Meeting],
-    now: DateTime<Utc>,
+    _now: DateTime<Utc>,
     forecast_fresh: impl Fn(i64) -> bool,
     track_fresh: impl Fn(i64) -> bool,
 ) -> bool {
@@ -68,7 +68,8 @@ pub fn quali_grid_needs_refresh(
 mod tests {
     use super::*;
     use crate::domain::championship::{
-        DriverStandingSnapshot, RaceResultSnapshot, TeamStandingSnapshot,
+        ChampionshipRoundSnapshot, DriverStandingSnapshot, RaceResultSnapshot,
+        TeamStandingSnapshot,
     };
 
     fn sample_session(key: i64, end: &str) -> Session {
@@ -109,6 +110,7 @@ mod tests {
                 drivers: vec![],
                 teams: vec![],
                 race_results: vec![],
+                starting_grid: vec![],
             }],
             fetched_at: now,
         };
@@ -148,6 +150,7 @@ mod tests {
                     dsq: false,
                     points: 25,
                 }],
+                starting_grid: vec![],
             }],
             fetched_at: now,
         };

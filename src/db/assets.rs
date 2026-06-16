@@ -43,8 +43,4 @@ impl AssetStore {
     pub fn mark_failed(&self, url: &str) -> Result<(), DbError> {
         self.with_db(|db| db.mark_asset_failed(url))
     }
-
-    pub fn clear(&self) -> Result<usize, DbError> {
-        self.with_db(|db| db.clear_asset_cache(&self.assets_dir))
-    }
 }

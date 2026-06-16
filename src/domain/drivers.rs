@@ -6,7 +6,6 @@ use crate::ui::theme::muted;
 
 #[derive(Debug, Clone)]
 pub struct PinnedDriverView {
-    pub pin: PinnedDriver,
     pub driver: Driver,
 }
 
@@ -36,10 +35,7 @@ pub fn pinned_driver_views(pins: &[PinnedDriver], roster: &[Driver]) -> Vec<Pinn
                 .iter()
                 .find(|driver| driver.driver_number == pin.driver_number)
                 .cloned()
-                .map(|driver| PinnedDriverView {
-                    pin: pin.clone(),
-                    driver,
-                })
+                .map(|driver| PinnedDriverView { driver })
         })
         .collect()
 }

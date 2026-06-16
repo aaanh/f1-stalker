@@ -22,6 +22,7 @@ pub fn error(message: impl AsRef<str>) {
     push("ERROR", message);
 }
 
+#[allow(dead_code)]
 pub fn debug(message: impl AsRef<str>) {
     push("DEBUG", message);
 }

@@ -16,13 +16,6 @@ fn vertical_scrollbar() -> Scrollbar {
         .margin(6.0)
 }
 
-fn horizontal_scrollbar() -> Scrollbar {
-    Scrollbar::new()
-        .width(5.0)
-        .scroller_width(5.0)
-        .margin(6.0)
-}
-
 fn scrollbar_rail(scroller_alpha: f32) -> scrollable::Rail {
     scrollable::Rail {
         background: None,
@@ -114,16 +107,6 @@ pub fn vertical_scroll<'a>(
 ) -> scrollable::Scrollable<'a, Message, Theme> {
     scrollable(content)
         .direction(Direction::Vertical(vertical_scrollbar()))
-        .style(move |theme, status| scrollbar_style(theme, status, visible))
-        .on_scroll(|_| Message::ScrollInteraction)
-}
-
-pub fn horizontal_scroll<'a>(
-    content: Element<'a, Message>,
-    visible: bool,
-) -> scrollable::Scrollable<'a, Message, Theme> {
-    scrollable(content)
-        .direction(Direction::Horizontal(horizontal_scrollbar()))
         .style(move |theme, status| scrollbar_style(theme, status, visible))
         .on_scroll(|_| Message::ScrollInteraction)
 }

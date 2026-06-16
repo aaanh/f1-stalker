@@ -31,16 +31,8 @@ pub fn driver_portrait(state: &AppState, driver: &Driver) -> Element<'static, Me
     driver_portrait_sized(state, driver, HEADSHOT_SIZE)
 }
 
-pub fn rival_driver_portrait(state: &AppState, driver: &Driver) -> Element<'static, Message> {
-    driver_portrait_sized(state, driver, 128.0)
-}
-
 pub fn rival_fighter_portrait(state: &AppState, driver: &Driver) -> Element<'static, Message> {
     driver_portrait_sized(state, driver, 112.0)
-}
-
-pub fn rival_fighter_team_logo(state: &AppState, driver: &Driver) -> Element<'static, Message> {
-    rival_fighter_team_logo_sized(state, driver, 112.0)
 }
 
 pub fn rival_fighter_team_logo_fill(state: &AppState, driver: &Driver) -> Element<'static, Message> {
@@ -96,24 +88,6 @@ fn team_logo_image(state: &AppState, driver: &Driver) -> Option<Element<'static,
     None
 }
 
-fn rival_fighter_team_logo_sized(state: &AppState, driver: &Driver, size: f32) -> Element<'static, Message> {
-    let inner = (size - BADGE_PADDING * 2.0).max(24.0);
-    let colour = team_colour(&driver.team_colour);
-    let fallback_size = (size * 0.32).max(18.0) as u16;
-
-    if let Some(url) = team_logo_url(&driver.team_name) {
-        if let Some(logo) = cached_image(state, &url, inner, inner) {
-            return icon_badge(logo, size, size);
-        }
-    }
-
-    icon_badge(
-        team_logo_fallback(&driver.team_name, colour, fallback_size),
-        size,
-        size,
-    )
-}
-
 fn team_logo_fallback(
     team_name: &str,
     colour: iced::Color,
@@ -129,7 +103,7 @@ fn team_logo_fallback(
     text(initial).size(font_size).color(colour).into()
 }
 
-fn driver_portrait_sized(
+pub fn driver_portrait_sized(
     state: &AppState,
     driver: &Driver,
     size: f32,
@@ -255,10 +229,6 @@ pub fn driver_nationality_flag(state: &AppState, driver: &Driver) -> Element<'st
         FLAG_BADGE_WIDTH,
         FLAG_BADGE_HEIGHT,
     )
-}
-
-pub fn team_logo(state: &AppState, driver: &Driver) -> Element<'static, Message> {
-    team_logo_sized(state, driver, LOGO_BADGE_SIZE, LOGO_IMAGE_SIZE, 12)
 }
 
 fn team_logo_sized(
